@@ -15,4 +15,6 @@
 *.dvi
 *.xdv
 *.pdf
+# figure PDFs are sources, not build output
+!pic/*.pdf
 .DS_Store
