@@ -32,9 +32,8 @@
 % harnesses
 \newcommand{\claudecode}{Claude Code}
 \newcommand{\opencode}{OpenCode}
-\newcommand{\rtwoe}{R2E-Gym}
 \newcommand{\codexcli}{Codex CLI}
-\newcommand{\openhands}{OpenHands SDK}
+\newcommand{\openhands}{OpenHands SDK}   % also the harness the code calls r2e-gym (internal OpenHands SDK build)
 % baseline
 \newcommand{\control}{compute-matched control}
 % headline measurements (single source of truth)
@@ -58,19 +57,25 @@ Affiliation \\
 \newcommand{\new}{\marginpar{NEW}}
 
 %\iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+% Top-of-page floats leave the text column short; with the style's flush bottom
+% that shortfall was stretched into 60pt gaps under captions.
+\raggedbottom
+
 \begin{document}
 
 \maketitle
 
 \begin{abstract}
-Software-engineering (SWE) agents interact with repositories through a
-\emph{harness} that defines their tools, call syntax, and observations. As a
-result, an agent trained in one harness can overfit to its interface and
-degrade when deployed in another: holding the model and tasks fixed, changing
-only the harness shifts \swev{} accuracy by $9.2$ points. We find that this
-variation is largely superficial. Across five production harnesses, diverse
-tool interfaces reduce to a shared set of only $12$ semantic actions. We
-formalize this common action space as the \HP{} and develop
+Large language models (LLMs) are increasingly deployed as software-engineering
+(SWE) agents that resolve real repository issues through multi-turn tool use.
+These agents interact with repositories
+through a \emph{harness} that defines their tools, call syntax, and
+observations. As a result, an agent trained in one harness can overfit to its
+interface and degrade when deployed in another: holding the model and tasks
+fixed, changing only the harness shifts \swev{} accuracy by $9.2$ points. We
+find that this variation is largely superficial. Across four production
+harnesses, diverse tool interfaces reduce to a shared set of only $12$ semantic
+actions. We formalize this common action space as the \HP{} and develop
 semantics-preserving transformations between the protocol and concrete
 harness interfaces, verified with zero mismatches over \numroundtrip{} real
 actions. Building on this representation, we introduce \method{}
@@ -87,33 +92,35 @@ of distribution shift for SWE agents.
 \section{Introduction}
 \label{sec:intro}
 
-\paragraph{Agents act through harnesses, and the harness is not neutral.}
-A modern SWE agent is a language model wrapped in a scaffold: a system prompt
-that documents a tool set, a protocol for emitting calls, an executor, and a
-formatter that returns observations. This wrapper, the \emph{harness}, is what
-the model actually sees. \claudecode{}, \opencode{}, \codexcli{}, OpenHands and \rtwoe{}
-all let an agent run shell commands and edit files, but they disagree on nearly
-every detail of how: whether reading a file is a first-class tool or a shell
-command, whether that tool is called \texttt{Read} or \texttt{view} or
-\texttt{str\_replace\_editor} with \texttt{command="view"}, whether output
-carries line numbers, whether an episode ends with a \texttt{finish} call or a
-plain reply.
+Recent years have seen rapid progress in LLM agents for software engineering.
+Given an issue reported against a real GitHub repository, an agent such as
+\claudecode{}, \codexcli{}, \opencode{} or \openhands{} explores the codebase,
+edits files, runs tests, and returns a patch, and SWE-bench
+\citep{jimenez2024swebench} has become the standard measure of how often that
+patch is correct. Underneath every such agent is a language model wrapped in a
+scaffold: a system prompt that documents a tool set, a protocol for emitting
+calls, an executor, and a formatter that returns observations. This wrapper,
+the \emph{harness}, is what the model actually sees.
 
-These are presentational choices, and one would like them not to matter. They
-do. Evaluating a single instruction-tuned model on a single task set and
-changing \emph{only} the harness (Table~\ref{tab:e0}), \swev{}
-accuracy ranges from $16.0\%$ to $25.2\%$, a $9.2$-point spread produced by
-nothing but the wrapper.
+The four harnesses above all let an agent run shell commands and edit files,
+but they disagree on nearly every detail of how: whether reading a file is a
+first-class tool or a shell command, whether that tool is called \texttt{Read}
+or \texttt{view} or \texttt{str\_replace\_editor} with
+\texttt{command="view"}, whether output carries line numbers, and whether an
+episode ends with a \texttt{finish} call or a plain reply. These are
+presentational choices, and one would like them not to matter. They do.
+Evaluating a single instruction-tuned model on a single task set and changing
+\emph{only} the harness (Table~\ref{tab:e0}), \swev{} accuracy ranges from
+$16.0\%$ to $25.2\%$, a $9.2$-point spread produced by nothing but the wrapper.
 
-\paragraph{Why the gap exists.}
-Agent training data is collected inside whichever harness the data pipeline
-uses. Supervised fine-tuning on that data teaches the task \emph{and} the
-surface at once, and the model receives no signal separating them. A tool named
-\texttt{Bash} that takes a \texttt{command} argument and returns untruncated
-output becomes as much a part of the learned policy as the decision to run the
-test suite before editing. Deployment in a different harness then presents a
-distribution shift that is, from the model's perspective, indistinguishable from
-a change of task (Figure~\ref{fig:overview}, left).
+The gap has a simple origin. Agent training data is collected inside whichever
+harness the data pipeline uses, and supervised fine-tuning on that data teaches
+the task \emph{and} the surface at once, with no signal separating them. A tool
+named \texttt{Bash} that takes a \texttt{command} argument and returns
+untruncated output becomes as much a part of the learned policy as the decision
+to run the test suite before editing. Deployment in a different harness then
+presents a distribution shift that is, from the model's perspective,
+indistinguishable from a change of task (Figure~\ref{fig:overview}, left).
 
 \begin{figure}[t]
 \begin{center}
@@ -131,51 +138,60 @@ the surface rather than bound to it.}
 \label{fig:overview}
 \end{figure}
 
-\paragraph{Harnesses share a small semantic core.}
-The gap is avoidable because the disagreement is superficial in a measurable
-sense. We parsed $\numtraj{}$ trajectories ($557{,}732$ steps, $\numactions{}$ tool
-calls) from five production harnesses whose declared tool counts range from $3$
-to $21$, and normalized every call into a semantic action. Twelve actions
-suffice: after normalization only $0.04\%$ of calls fall outside the vocabulary
-(Table~\ref{tab:vocab}). The harnesses are not doing different things; they are
-naming and packaging the same things differently.
+We argue that this shift is avoidable, because the disagreement between
+harnesses is superficial in a measurable sense. We parsed \numtraj{}
+trajectories ($557{,}732$ steps, \numactions{} tool calls) from four production
+harnesses whose declared tool counts range from $3$ to $21$, and normalized
+every call into a semantic action. Twelve actions suffice: after normalization
+only $0.04\%$ of calls fall outside the vocabulary (Table~\ref{tab:vocab}). The
+harnesses are not doing different things; they are naming and packaging the
+same things differently. We make this core explicit and call it the \HP{}. A
+concrete harness is then the protocol plus a choice of \emph{surface}, and the
+surface decomposes into five axes that can be set independently: tool
+granularity and naming, call syntax, prompt documentation, observation
+formatting, and turn conventions. The abstraction is not lossy: rendering a
+protocol trajectory into a surface and parsing it back recovers the original
+action sequence exactly, measured over \numroundtrip{} actions at \rtacc{}
+(Section~\ref{sec:protocol}). This is a \emph{descriptive} claim about
+harnesses that already exist, not a proposal for a new standard.
 
-We make this core explicit and call it the \HP{}. A concrete harness is then the
-protocol plus a choice of \emph{surface}, and the surface decomposes into five
-axes that can be set independently: tool granularity and naming, call syntax,
-prompt documentation, observation formatting, and turn conventions. The abstraction is not lossy: rendering a protocol trajectory into a surface and
-parsing it back recovers the original action sequence exactly, measured over
-\numroundtrip{} actions at \rtacc{} (Section~\ref{sec:protocol}). We stress that
-this is a \emph{descriptive} claim about harnesses that already exist, not a
-proposal for a new standard.
+Exact invertibility is what turns the protocol from an analysis tool into a
+training signal. If a real trajectory can be undressed into protocol form and
+re-dressed in an arbitrary surface, then a single collected episode represents
+an entire orbit of equivalent episodes. We introduce \method{}
+(Harness-INvariant Training), which trains on that orbit
+(Figure~\ref{fig:overview}, right). Counterfactual Harness Rendering (\chr{})
+re-renders every trajectory under freshly sampled surface configurations, and
+interface anonymization replaces tool names with meaningless identifiers on a
+fraction of samples, so that reading the documentation rather than recognizing
+the name becomes the only reliable strategy. \method{} needs no new task data
+and no architectural change.
 
-\paragraph{\method{}.} Exact invertibility is what makes the protocol useful for
-training rather than merely for analysis. If a real trajectory can be undressed
-into protocol form and re-dressed in an arbitrary surface, then a single
-collected episode represents an entire orbit of equivalent episodes. \method{}
-trains on that orbit (Figure~\ref{fig:overview}, right): Counterfactual Harness
-Rendering (\chr{}) re-renders every
-trajectory under freshly sampled surface configurations, and interface
-anonymization replaces tool names with meaningless identifiers on a fraction of
-samples, so that reading the documentation rather than recognizing the name
-becomes the only reliable strategy.
-
-\paragraph{Contributions.}
-\begin{enumerate}
+We fine-tune \basemodel{} on \claudecode{} trajectories and evaluate under real
+harnesses that training never showed as coherent wholes, against a \control{}
+that sees the same trajectories the same number of times in their original
+harness. \method{} reduces the accuracy lost when the model is moved to an
+unseen harness from $10.4$ to $4.7$ points on \swem{}, and gains $7.7$ points
+when both the harness and the programming languages are unseen. Together, these
+results reframe harness variation: it is not a property of the task that a
+model must absorb, but a nuisance factor that a training pipeline can
+marginalize over. Our contributions are summarized as follows:
+\begin{itemize}
 \item \textbf{A measurement.} Harness choice alone moves \swev{} by
   $9.2$ points for a fixed model and task set, and the harness that does worst
   is not the one with the fewest tools (Section~\ref{sec:exp}).
 \item \textbf{The \HP{}, with an exactness guarantee that is measured rather
-  than assumed.} A $12$-action vocabulary covers $99.96\%$ of $\numactions{}$ real
-  calls from five harnesses; surface rendering is exactly invertible on \numroundtrip{}
-  actions (Section~\ref{sec:protocol}).
-\item \textbf{\method{}}, a training method needing no new task data and no
-  architecture change: it multiplies existing trajectories along the surface
-  axes (Section~\ref{sec:method}).
+  than assumed.} A $12$-action vocabulary covers $99.96\%$ of \numactions{} real
+  calls from four harnesses; surface rendering is exactly invertible on
+  \numroundtrip{} actions (Section~\ref{sec:protocol}).
+\item \textbf{\method{}}, a training method that multiplies existing
+  trajectories along the surface axes, needing no new task data and no
+  architecture change (Section~\ref{sec:method}).
 \item \textbf{A compute-matched evaluation.} Against a control that sees the
   same trajectories the same number of times in their original harness,
-  \method{} halves cross-harness degradation (Section~\ref{sec:exp}).
-\end{enumerate}
+  \method{} more than halves the cross-harness loss on \swem{}
+  (Section~\ref{sec:exp}).
+\end{itemize}
 
 \section{The Harness Protocol}
 \label{sec:protocol}
@@ -185,7 +201,7 @@ becomes the only reliable strategy.
 \paragraph{Semantic actions.} Let $\mathcal{A}$ be a finite vocabulary of
 semantic actions, each a pair of a verb and a typed argument record. We take
 $\mathcal{A}$ to be the $12$ actions of Table~\ref{tab:vocab}, obtained by
-normalizing five harnesses' tool sets rather than by design. A \emph{protocol
+normalizing four harnesses' tool sets rather than by design. A \emph{protocol
 trajectory} is a sequence $\tau = \big[(c_t, a_t, o_t)\big]_{t=1}^{T}$ where
 $a_t \in \mathcal{A}$ is an action, $o_t$ the semantic content of the resulting
 observation with formatting removed, and $c_t$ the agent's reasoning text.
@@ -231,7 +247,7 @@ $d(h,h') = \big|\{\, i : h_i \neq h'_i \,\}\big|$.
 \subsection{What the measurement shows}
 
 \begin{table}[t]
-\caption{The $12$-action vocabulary recovered by normalizing five harnesses,
+\caption{The $12$-action vocabulary recovered by normalizing four harnesses,
 with its distribution over $\numactions{}$ real tool calls. \texttt{unknown} is not
 part of the vocabulary; it is the residual, and its size bounds the coverage
 error.}
@@ -257,9 +273,10 @@ Action & Share & Action & Share \\
 \end{table}
 
 \begin{table}[t]
-\caption{Five production harnesses agree on semantics and disagree on
+\caption{Four production harnesses agree on semantics and disagree on
 everything else. ``Tools'' counts the standard declared schema; granularity is
-the $A_1$ setting each harness occupies.}
+the $A_1$ setting each harness occupies. \openhands{} appears in its two
+tool-name generations, both parsed; we collect and evaluate in the classic one.}
 \label{tab:harnesses}
 \begin{center}
 \begin{small}
@@ -267,8 +284,8 @@ the $A_1$ setting each harness occupies.}
 \toprule
 Harness & Tools & Granularity & Shell tool & File read \\
 \midrule
-\rtwoe{}       & $3$  & unified editor & \texttt{execute\_bash} & \texttt{str\_replace\_editor} \\
-\openhands{} & $4$  & unified editor & \texttt{terminal}      & \texttt{file\_editor} \\
+\openhands{} (classic) & $3$  & unified editor & \texttt{execute\_bash} & \texttt{str\_replace\_editor} \\
+\openhands{} (current) & $4$  & unified editor & \texttt{terminal}      & \texttt{file\_editor} \\
 \opencode{}      & $11$ & split          & \texttt{bash}          & \texttt{read} \\
 \codexcli{}     & $13$ & shell only     & \texttt{exec\_command} & --- (via shell) \\
 \claudecode{}   & $21$ & split          & \texttt{Bash}          & \texttt{Read} \\
@@ -279,7 +296,7 @@ Harness & Tools & Granularity & Shell tool & File read \\
 \end{table}
 
 Table~\ref{tab:harnesses} makes the spread concrete, and the extremes are
-instructive. \rtwoe{} exposes three tools; \claudecode{} exposes twenty-one. \codexcli{} declares thirteen tools but \emph{none} of them reads, edits or searches
+instructive. \openhands{} exposes three tools; \claudecode{} exposes twenty-one. \codexcli{} declares thirteen tools but \emph{none} of them reads, edits or searches
 files: $97\%$ of its calls go to a single \texttt{exec\_command} entry point,
 and of those command bodies $27\%$ are file reads (\texttt{sed -n},
 \texttt{cat}, \texttt{head}), $18\%$ are searches (\texttt{grep},
@@ -300,7 +317,7 @@ and all arguments match.}
 \toprule
 Corpus & Trajectories & Actions checked & Mismatches & Consistency \\
 \midrule
-Four-harness set    & $2{,}832$ & $522{,}004$ & $0$ & \rtacc{} \\
+Mixed set (four corpora) & $2{,}832$ & $522{,}004$ & $0$ & \rtacc{} \\
 \claudecode{} (large) & $5{,}000$ & $886{,}407$ & $0$ & \rtacc{} \\
 \codexcli{}           & $2{,}041$ & $457{,}962$ & $0$ & \rtacc{} \\
 \midrule
@@ -384,7 +401,7 @@ here use L1 and L2 only.
 \subsection{\cham{}: a harness whose surface is a configuration}
 
 Real harnesses cannot be perturbed one axis at a time: there is no way to give
-\claudecode{} \rtwoe{}'s observation format while holding everything else fixed. We
+\claudecode{} \openhands{}'s observation format while holding everything else fixed. We
 therefore implement \cham{}, an executable agent harness in which every surface
 property is a configuration parameter drawn from the same five axes. \cham{}
 really parses calls, really executes them against a workspace, and formats
@@ -414,7 +431,7 @@ identical schedule; the two runs' training scripts differ in two lines. Matching
 \emph{sample counts} instead would have given the control $27\%$ more tokens,
 since \chr{} samples are $34\%$ shorter than the originals.
 
-\paragraph{Evaluation.} We report \swev{} ($500$ tasks) and \swem{} ($300$ tasks), each executed under three real harnesses: \claudecode{} (the source harness), \opencode{} and \rtwoe{} (both unseen during training).
+\paragraph{Evaluation.} We report \swev{} ($500$ tasks) and \swem{} ($300$ tasks), each executed under three real harnesses: \claudecode{} (the source harness), \opencode{} and \openhands{} (both unseen during training).
 Repeated submissions of an identical configuration give a run-to-run noise floor
 of $\pm2.0$ points on the $500$-task set and $\pm1.0$ points on the $300$-task
 set; differences below these are not interpretable.
@@ -431,7 +448,7 @@ set; differences below these are not interpretable.
 Harness & \swev{} & \swem{} \\
 \midrule
 \claudecode{} & $25.2\%$ & $14.7\%$ \\
-\rtwoe{}     & $22.2\%$ & $\phantom{0}9.0\%$ \\
+\openhands{} & $22.2\%$ & $\phantom{0}9.0\%$ \\
 \opencode{}    & $16.0\%$ & $13.3\%$ \\
 \midrule
 Spread      & $\mathbf{9.2}$ pts & $5.7$ pts \\
@@ -524,11 +541,11 @@ the number of distinct surfaces then yields an accuracy-versus-diversity curve.
 against the noise floor and two cells are still executing. We report the
 incomplete cells rather than omitting them.
 
-\paragraph{\rtwoe{} results are unusable.} Both arms time out on \rtwoe{} at high
+\paragraph{\openhands{} results are unusable.} Both arms time out on \openhands{} at high
 rates ($25\%$ and $64\%$ of settled trials), traced to a proactive-compaction
 threshold set above the context length actually reached, so per-step prefill
 grows until the wall clock is exhausted. Until the threshold is corrected and
-both arms re-run, no \rtwoe{} number enters a conclusion. We note, as a
+both arms re-run, no \openhands{} number enters a conclusion. We note, as a
 hypothesis rather than a result, that the control times out $2.5\times$ more
 often than \method{} under an identical evaluation configuration, which would be
 a behavioural generalization signal that accuracy alone does not capture.
@@ -557,9 +574,9 @@ invertible and would forfeit the guarantee of Proposition~1.
 established the benchmark; \citet{yang2024sweagent} showed that the
 agent--computer interface itself materially determines performance, which is the
 observation our work builds on and generalizes. OpenHands
-\citep{wang2025openhands} and \rtwoe{} \citep{jain2025r2egym} are widely used
-scaffolds with mutually incompatible interfaces; SWE-smith
-\citep{yang2025swesmith} scales task supply but leaves the interface fixed. We
+\citep{wang2025openhands} is the most widely used open scaffold; R2E-Gym
+\citep{jain2025r2egym} and SWE-smith \citep{yang2025swesmith} scale task and
+environment supply but leave the interface fixed. We
 are, to our knowledge, the first to treat the scaffold as a nuisance variable to
 be marginalized out during training.
 
@@ -577,15 +594,15 @@ of \citet{allen2019analogies}.
 
 \section{Conclusion}
 
-Agent harnesses differ far more on the surface than in substance: five
+Agent harnesses differ far more on the surface than in substance: four
 production harnesses, ranging from three tools to twenty-one and from
 first-class file editors to nothing but a shell, reduce to twelve semantic
 actions covering $99.96\%$ of $\numactions{}$ real calls. Making that core explicit
 as the \HP{}, and verifying that the surface map is exactly invertible over
 \numroundtrip{} actions, turns interface variation into something a training pipeline
 can marginalize over. \method{} does so with no new task data and no
-architectural change, and halves the accuracy an agent loses when it is moved to
-a harness it has never seen.
+architectural change, and on \swem{} more than halves the accuracy an agent
+loses when it is moved to a harness it has never seen.
 
 \bibliography{hint}
 \bibliographystyle{iclr2027_conference}
