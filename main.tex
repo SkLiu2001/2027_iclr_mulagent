@@ -353,8 +353,8 @@ under real harnesses that were never seen in training.}
 \label{fig:pipeline}
 \end{figure}
 
-\method{} has two components that touch only the data and one optional component
-that touches the objective; nothing about the model architecture changes.
+\method{} has two components, both of which touch only the data; nothing about
+the model architecture or the training objective changes.
 Figure~\ref{fig:pipeline} traces the pipeline end to end.
 
 \subsection{L1: Counterfactual Harness Rendering}
@@ -393,15 +393,6 @@ that no parsed harness uses ($\approx27\%$), and meaningless pronounceable
 identifiers ($30\%$). Canonical semantics are never anonymized: they remain in the tool
 documentation, so under the third tier the documentation is the only channel
 carrying the information needed to act.
-
-\subsection{L3 (optional): representation alignment}
-
-Because \chr{} produces multiple renderings of the same decision point, and
-Proposition~1 guarantees they are semantically identical, aligning their hidden
-representations is well posed: an InfoNCE term over matched decision points
-pulls together renderings of the same protocol state and pushes apart different
-states. We describe this component for completeness; the experiments reported
-here use L1 and L2 only.
 
 \subsection{\cham{}: a harness whose surface is a configuration}
 
@@ -607,7 +598,9 @@ as the \HP{}, and verifying that the surface map is exactly invertible over
 \numroundtrip{} actions, turns interface variation into something a training pipeline
 can marginalize over. \method{} does so with no new task data and no
 architectural change, and on \swem{} more than halves the accuracy an agent
-loses when it is moved to a harness it has never seen.
+loses when it is moved to a harness it has never seen. Aligning hidden
+representations across renderings of the same decision point, which
+Proposition~1 makes well posed, is the natural next step.
 
 \bibliography{hint}
 \bibliographystyle{iclr2027_conference}
