@@ -33,7 +33,7 @@
 \newcommand{\claudecode}{Claude Code}
 \newcommand{\opencode}{OpenCode}
 \newcommand{\codexcli}{Codex CLI}
-\newcommand{\openhands}{OpenHands SDK}   % also the harness the code calls r2e-gym (internal OpenHands SDK build)
+\newcommand{\openhands}{OpenHands SDK}   % the harness the code calls r2e-gym is an internal OpenHands SDK build; the paper describes OpenHands SDK by its current tool surface (terminal / file_editor / task_tracker / finish)
 % baseline
 \newcommand{\control}{compute-matched control}
 % headline measurements (single source of truth)
@@ -105,7 +105,7 @@ the \emph{harness}, is what the model actually sees.
 The four harnesses above all let an agent run shell commands and edit files,
 but they disagree on nearly every detail of how: whether reading a file is a
 first-class tool or a shell command, whether that tool is called \texttt{Read}
-or \texttt{view} or \texttt{str\_replace\_editor} with
+or \texttt{read} or \texttt{file\_editor} with
 \texttt{command="view"}, whether output carries line numbers, and whether an
 episode ends with a \texttt{finish} call or a plain reply. These are
 presentational choices, and one would like them not to matter. They do.
@@ -141,7 +141,7 @@ the surface rather than bound to it.}
 We argue that this shift is avoidable, because the disagreement between
 harnesses is superficial in a measurable sense. We parsed \numtraj{}
 trajectories ($557{,}732$ steps, \numactions{} tool calls) from four production
-harnesses whose declared tool counts range from $3$ to $21$, and normalized
+harnesses whose declared tool counts range from $4$ to $21$, and normalized
 every call into a semantic action. Twelve actions suffice: after normalization
 only $0.04\%$ of calls fall outside the vocabulary (Table~\ref{tab:vocab}). The
 harnesses are not doing different things; they are naming and packaging the
@@ -220,16 +220,24 @@ turn and completion conventions. A harness is a point $h \in \mathcal{H}$;
 sampling a point is sampling a synthetic harness.
 
 \paragraph{Proposition 1 (round-trip exactness).} \emph{For every
-$h \in \mathcal{H}$ realized by our renderer, $R_h$ is injective on protocol
-trajectories, and the corresponding parser $P_h$ satisfies
-$P_h \circ R_h = \mathrm{id}$.} We do not prove this analytically; we measure
-it. For each of \numroundtrip{} actions drawn from six corpora we render under randomly
+$h \in \mathcal{H}$ realized by our renderer there is a parser $P_h$ with
+$P_h \circ R_h = \mathrm{id}$ on the action sequence of every protocol
+trajectory: exactly for the three syntax families with named tools, and up to
+an operational equivalence $\simeq$ (a file read and the shell command that
+performs it) for the shell-only family. In particular $R_h$ is injective on
+actions, modulo $\simeq$.} Appendix~\ref{app:proof} proves this by
+construction, one stage at a time: granularity and naming form an injective
+table lookup, and each syntax family is a decodable encoding of the named
+record, with a JSON escape encoding for the few values a family cannot carry.
+The proof covers the design; Table~\ref{tab:roundtrip} checks that the
+implementation meets the proof's premises on real data. For each of
+\numroundtrip{} actions drawn from six corpora we render under randomly
 sampled configurations spanning all four call-syntax families and parse the
 result back, comparing the action verb and every argument. Agreement is
-\rtacc{} with zero mismatches (Table~\ref{tab:roundtrip}). Two consequences
-follow. First, the composition $T_{h \to h'} = R_{h'} \circ R_h^{-1}$ is a
-well-defined, semantics-preserving translation between any two harnesses, so the
-protocol acts as a normal form. Second, the identifiability assumption behind
+\rtacc{} with zero mismatches; $\simeq$ cases are counted as consistent, never
+as exact. Two consequences follow. First, the composition
+$T_{h \to h'} = R_{h'} \circ P_h$ is a well-defined, semantics-preserving
+translation between any two harnesses, so the protocol acts as a normal form. Second, the identifiability assumption behind
 augmentation-based representation learning, namely that the augmentation
 leaves \emph{content} untouched and perturbs only \emph{style}
 \citep{kugelgen2021self}, holds here by construction and by measurement, rather
@@ -275,8 +283,7 @@ Action & Share & Action & Share \\
 \begin{table}[t]
 \caption{Four production harnesses agree on semantics and disagree on
 everything else. ``Tools'' counts the standard declared schema; granularity is
-the $A_1$ setting each harness occupies. \openhands{} appears in its two
-tool-name generations, both parsed; we collect and evaluate in the classic one.}
+the $A_1$ setting each harness occupies.}
 \label{tab:harnesses}
 \begin{center}
 \begin{small}
@@ -284,8 +291,7 @@ tool-name generations, both parsed; we collect and evaluate in the classic one.}
 \toprule
 Harness & Tools & Granularity & Shell tool & File read \\
 \midrule
-\openhands{} (classic) & $3$  & unified editor & \texttt{execute\_bash} & \texttt{str\_replace\_editor} \\
-\openhands{} (current) & $4$  & unified editor & \texttt{terminal}      & \texttt{file\_editor} \\
+\openhands{}     & $4$  & unified editor & \texttt{terminal}      & \texttt{file\_editor} \\
 \opencode{}      & $11$ & split          & \texttt{bash}          & \texttt{read} \\
 \codexcli{}     & $13$ & shell only     & \texttt{exec\_command} & --- (via shell) \\
 \claudecode{}   & $21$ & split          & \texttt{Bash}          & \texttt{Read} \\
@@ -296,7 +302,7 @@ Harness & Tools & Granularity & Shell tool & File read \\
 \end{table}
 
 Table~\ref{tab:harnesses} makes the spread concrete, and the extremes are
-instructive. \openhands{} exposes three tools; \claudecode{} exposes twenty-one. \codexcli{} declares thirteen tools but \emph{none} of them reads, edits or searches
+instructive. \openhands{} exposes four tools; \claudecode{} exposes twenty-one. \codexcli{} declares thirteen tools but \emph{none} of them reads, edits or searches
 files: $97\%$ of its calls go to a single \texttt{exec\_command} entry point,
 and of those command bodies $27\%$ are file reads (\texttt{sed -n},
 \texttt{cat}, \texttt{head}), $18\%$ are searches (\texttt{grep},
@@ -380,8 +386,7 @@ base model's tool-calling ability.
 
 Sampling from real vocabularies alone leaves a shortcut intact: each semantic
 function has only a handful of attested names, so a model can still map
-\texttt{Bash}, \texttt{bash}, \texttt{execute\_bash}, \texttt{terminal} and
-\texttt{exec\_command} onto ``the shell tool'' by memorization. We therefore
+\texttt{Bash}, \texttt{bash}, \texttt{terminal} and \texttt{exec\_command} onto ``the shell tool'' by memorization. We therefore
 draw tool names from three tiers: names harvested verbatim from real harnesses
 but \emph{recombined across} them ($\approx43\%$ of samples), plausible names
 that no parsed harness uses ($\approx27\%$), and meaningless pronounceable
@@ -595,7 +600,7 @@ of \citet{allen2019analogies}.
 \section{Conclusion}
 
 Agent harnesses differ far more on the surface than in substance: four
-production harnesses, ranging from three tools to twenty-one and from
+production harnesses, ranging from four tools to twenty-one and from
 first-class file editors to nothing but a shell, reduce to twelve semantic
 actions covering $99.96\%$ of $\numactions{}$ real calls. Making that core explicit
 as the \HP{}, and verifying that the surface map is exactly invertible over
@@ -606,5 +611,266 @@ loses when it is moved to a harness it has never seen.
 
 \bibliography{hint}
 \bibliographystyle{iclr2027_conference}
+
+\appendix
+\section{Proof of Proposition 1}
+\label{app:proof}
+
+Proposition~1 states that the surface map of every harness our renderer
+realizes is exactly invertible on the action channel. The proof is by
+construction: the renderer is a composition of two stages, and each stage is
+shown to have a left inverse. Section~\ref{app:setting} fixes notation,
+Sections~\ref{app:naming}--\ref{app:shell} prove one lemma per stage,
+Section~\ref{app:theorem} assembles them, and Section~\ref{app:premises}
+lists the premises and states precisely what the measurement of
+Table~\ref{tab:roundtrip} adds to the proof.
+
+\subsection{Setting}
+\label{app:setting}
+
+\paragraph{Actions.} An action is a pair $a=(v,r)$ of a \emph{verb}
+$v\in\mathcal{V}$ and a \emph{record} $r$. The verb set $\mathcal{V}$ has the
+twelve elements of Table~\ref{tab:vocab} (the four \texttt{edit\_file}
+sub-actions count as distinct verbs). Every verb has a finite set of parameter
+keys $K_v$, each with a declared type (string, integer, boolean, or JSON
+value); a record is a partial map $r:K_v\rightharpoonup \mathbb{V}$ from keys to
+values of the declared type. Unset keys are simply absent; two records are
+equal when they are equal as partial maps. $\mathcal{A}$ is the set of all such
+pairs.
+
+\paragraph{Configurations.} Of the five axes of Eq.~(\ref{eq:axes}), only
+$A_1$ and $A_2$ touch the text of a call. A configuration $h$ contributes
+\begin{itemize}
+\item a granularity $g\in\{\textsc{split},\textsc{unified},\textsc{mono}\}$,
+      which fixes the set $T_g$ of surface tools: twelve tools, one per verb;
+      eight tools, one \emph{editor} tool shared by the five file verbs; or a
+      single tool;
+\item a tool-name map $N:T_g\to\Sigma^{*}$ and a parameter-name map
+      $\Pi:K\to\Sigma^{*}$, where $K$ is the union of all $K_v$ together with
+      the \emph{selector} keys of the editor and the single tool;
+\item a syntax family $s\in\{\textsc{json},\textsc{xml},\textsc{yaml},
+      \textsc{shell}\}$.
+\end{itemize}
+The remaining components (prompt template, documentation style, observation
+decoration, turn conventions) are constant with respect to the action text and
+play no role below.
+
+\paragraph{Factorization.} On one action the renderer is
+$R_h = E_s\circ N_h$, where the naming stage $N_h$ maps an action to a
+\emph{named record} $(n,\rho)$ (a surface tool name and a record over surface
+parameter names) and the syntax stage $E_s$ serializes the named record to
+text. The parser is $P_h = N_h^{-1}\circ D_s$ with $D_s$ the block decoder of
+the family. The shell family has no named tools and defines $E_{\textsc{shell}}$
+directly on actions (Section~\ref{app:shell}). All four families share an
+\emph{escape encoding} $E_{\mathrm{esc}}(a)$: a fenced block tagged
+\texttt{call} whose single line is the JSON serialization of
+$\{\texttt{action}:v,\ \texttt{args}:r\}$ with the canonical verb and keys.
+Since JSON escapes newlines, the payload occupies one line and the closing
+fence is unambiguous, so $E_{\mathrm{esc}}$ is decoded exactly by reading the
+fence and applying the JSON parser. Every use of $E_{\mathrm{esc}}$ below is
+therefore exact and bypasses the naming stage.
+
+\paragraph{Premises.} The lemmas use four premises, each discharged in
+Section~\ref{app:premises}:
+\begin{itemize}
+\item[(P1)] $N$ is injective on $T_g$;
+\item[(P2)] $\Pi$ is injective on the key set of each surface tool;
+\item[(P3)] (\textsc{json} only) no argument value contains a well-formed call of
+      the same configuration;
+\item[(P4)] values carry their declared types, and a string-valued JSON
+      parameter is not itself a JSON document.
+\end{itemize}
+
+\subsection{Lemma 1: the naming stage is an injective table lookup}
+\label{app:naming}
+
+\paragraph{Lemma 1.} \emph{Under (P1), (P2) and (P4), $N_h$ is injective and the
+inverse tables of the parser recover $(v,r)$ from $(n,\rho)$.}
+
+\emph{Proof.} Let $\tau:\mathcal{V}\to T_g$ assign each verb its surface tool.
+Under \textsc{split}, $\tau$ is a bijection and $N_h(v,r)=(N(\tau(v)),\
+r\circ\Pi^{-1})$. Under \textsc{unified}, the five file verbs share the editor
+tool, and $N_h$ adds to the renamed record one selector entry
+$\Pi(\mathrm{sel})\mapsto\ell(v)$ with $\ell$ an injection of the five verbs
+into the literals $\{\texttt{view},\texttt{str\_replace},\texttt{insert},
+\texttt{create},\texttt{undo\_edit}\}$; all other verbs are treated as under
+\textsc{split}. Under \textsc{mono}, every verb uses the single tool and the
+selector carries one of twelve distinct literals. In each case the decoder
+proceeds in three steps. (i) From $n$ it recovers the surface tool, because $N$
+is injective (P1). (ii) If the tool is the editor or the single tool, it reads
+the selector entry, which is present because the encoder always writes it and
+unambiguous because the selector key is distinct from every data key of that
+tool (P2); the literal determines $v$ because $\ell$ is injective. Otherwise
+the tool determines $v$ because $\tau$ is a bijection on the remaining verbs.
+(iii) It renames the data keys back through $\Pi^{-1}$, which is well defined
+on the tool's key set by (P2), and re-types the values by the declared type
+of each key, which returns the original values by (P4). Hence the decoder is a
+left inverse of $N_h$ and $N_h$ is injective. $\square$
+
+\subsection{Lemma 2: the named-tool syntax families are decodable encodings}
+\label{app:named}
+
+\paragraph{Lemma 2.} \emph{For $s\in\{\textsc{json},\textsc{xml},\textsc{yaml}\}$
+and every named record $(n,\rho)$, $D_s(E_s(n,\rho))=(n,\rho)$; for
+\textsc{json} this uses (P3).}
+
+\emph{Proof.} Write $J$ for JSON serialization. $J$ is injective on finite
+records with distinct string keys and values of the types above (every string
+becomes a quoted string in which quotes, backslashes and control characters
+are escaped), and $J^{-1}\circ J$ is the identity on them.
+
+\textsc{json}: $E(n,\rho)$ is $J(\{\texttt{name}:n,\texttt{arguments}:\rho\})$
+between an opening and a closing tag. $D$ scans for the opening tag, takes the
+first brace after it and the shortest prefix that is a balanced object under a
+string-aware bracket count, and applies $J^{-1}$. The output of $J$ is itself
+such a balanced object, and braces inside its string literals are skipped by
+the string-aware count, so the recovered prefix is exactly $J$'s output. A tag
+occurring inside a value can only start a second candidate block; by (P3) that
+block is not a well-formed call of the configuration and is rejected, so the
+decoder returns the single record. In the structured tool-calling channel used
+for training, the object is carried by the API rather than located by tag
+scanning, and (P3) is not needed.
+
+\textsc{xml}: if any value contains a closing marker of the family
+(\texttt{</arg>}, \texttt{</invoke>}, or the opening of an invoke element),
+$E$ routes the action to $E_{\mathrm{esc}}$, which is exact. Otherwise $E$
+writes an invoke element carrying $n$ and, per key, an \texttt{arg} element
+carrying the value: strings verbatim, other types as $J(\cdot)$. $D$ takes the
+shortest span from the opening element to \texttt{</invoke>} and, inside it,
+the shortest span from each \texttt{arg} opening to the next \texttt{</arg>}.
+Because no value contains these markers, both spans are the intended ones;
+newlines are matched, so strings come back verbatim, and non-string values are
+recovered by $J^{-1}$ followed by re-typing (P4).
+
+\textsc{yaml}: $E$ opens a fence tagged \texttt{action}, writes
+\texttt{tool:} $n$, then one line per key. A value that is not a multi-line
+string is written on the key's own line as $J(\cdot)$; a multi-line string is
+written as a block scalar (\texttt{|-}) whose lines follow, each prefixed by
+exactly four spaces, an empty line becoming four spaces. The fence closes at
+column~0. No value can produce a line starting at column~0: single-line values
+are on the key line with newlines escaped by $J$, and block lines are indented.
+Hence the first column-0 fence after the opening is the true end of the block.
+$D$ reads key lines at two spaces of indentation, collects the four-space lines
+of a block scalar while stripping the prefix, and drops trailing lines that are
+genuinely empty; the only such line is the one produced by the newline before
+the closing fence, since empty value lines were encoded as four spaces. Scalars
+on key lines are recovered by $J^{-1}$. $\square$
+
+\subsection{Lemma 3: the shell-only family is exact up to $\simeq$}
+\label{app:shell}
+
+The \textsc{shell} family has no named tools, so the naming stage is empty and
+$E_{\textsc{shell}}$ is defined verb by verb. Some verbs have no surface form of
+their own in this family and are \emph{lowered} to the shell command that
+performs them; the decoder then returns that command. This is the one place
+where the round trip is not literally the identity, and we make the slack
+explicit.
+
+\paragraph{Operational equivalence.} Write $a\simeq a'$ when the two actions
+induce the same environment transition and the same observation content, with
+decoration removed, from every workspace state. The relation identifies:
+a file read with the shell command that performs it,
+$\texttt{read\_file}(p,s,e)\simeq\texttt{run\_shell}(\texttt{sed -n
+\textquotesingle s,ep\textquotesingle{} }p)$ and $\texttt{read\_file}(p)\simeq\texttt{run\_shell}(\texttt{cat
+}p)$; a search with the corresponding \texttt{grep} or \texttt{find}
+command; a fetch with \texttt{curl}; two shell commands that differ only in
+leading or trailing newlines; a submission whose message is empty with the
+documented filler message; and an action with an argument the executor
+ignores (the display label of a delegation, the \texttt{view}/\texttt{plan}
+selector of a task-list update) with the same action without it.
+
+\paragraph{Lemma 3.} \emph{For every action $a$,
+$P_{\textsc{shell}}(E_{\textsc{shell}}(a))\simeq a$. Consequently
+$E_{\textsc{shell}}(a)=E_{\textsc{shell}}(a')$ implies $a\simeq a'$.}
+
+\emph{Proof.} We list the encoding and its decoding per verb.
+\texttt{run\_shell}: the command in a fenced block tagged \texttt{bash}; a
+command containing a fence goes to $E_{\mathrm{esc}}$. The decoder takes the
+shortest span to the closing fence and strips outer newlines ($\simeq$).
+\texttt{edit\_file}: a patch envelope. The header line carries the path, so a
+path that is empty, contains a newline, has outer whitespace, or contains the
+envelope terminator goes to $E_{\mathrm{esc}}$; the body carries the old and
+new text line by line, each line prefixed by \texttt{-} or \texttt{+}, so any
+content is expressible except one containing the terminator itself, which
+goes to $E_{\mathrm{esc}}$. Insertion adds \texttt{@@ after line $k$} to the
+header, creation uses an \texttt{Add File} header with \texttt{+} lines,
+undo a \texttt{Revert Last Edit} header, and a replace-all edit, which no patch
+expresses, goes to $E_{\mathrm{esc}}$. The decoder inverts each form line by
+line and is exact. \texttt{delegate}: an envelope whose header carries the
+agent kind and whose body carries the prompt verbatim (the terminator inside
+the prompt goes to $E_{\mathrm{esc}}$); the display label is dropped
+($\simeq$). \texttt{task\_track}: a \texttt{PLAN UPDATE} block whose body,
+the list serialized by $J$ when structured, runs to the next block; a body
+containing a block opener goes to $E_{\mathrm{esc}}$; the selector is dropped
+($\simeq$). \texttt{web\_search}, and \texttt{web\_fetch} with an extraction
+prompt: $E_{\mathrm{esc}}$, exact. \texttt{read\_file}, \texttt{search} and
+\texttt{web\_fetch} without a prompt: lowered to \texttt{sed}/\texttt{cat},
+\texttt{grep}/\texttt{find} and \texttt{curl} commands inside a \texttt{bash}
+fence, decoded as \texttt{run\_shell} ($\simeq$). \texttt{submit}: the message
+as plain text; a message that is empty or whitespace becomes the filler
+($\simeq$), and one containing a block opener goes to $E_{\mathrm{esc}}$. The
+decoder collects fences, escape blocks, patch and delegation envelopes and the
+plan block, keeps the earliest non-overlapping ones so that a fence quoted
+inside a patch body is not a second call, and reads block-free text as a
+submission. In every case the decoded action is the original or its
+$\simeq$-image, which proves the first claim; the second follows because
+$\simeq$-images are unique up to $\simeq$. $\square$
+
+\subsection{Proof of the proposition}
+\label{app:theorem}
+
+For a configuration with a named-tool family, Lemmas~1 and~2 give
+$P_h\circ R_h = N_h^{-1}\circ D_s\circ E_s\circ N_h = N_h^{-1}\circ N_h =
+\mathrm{id}$ on $\mathcal{A}$. For the shell family, Lemma~3 gives
+$P_h\circ R_h\simeq\mathrm{id}$. A map with a left inverse is injective, so
+$R_h$ is injective on actions, modulo $\simeq$ in the shell case. The
+trajectory-level statement follows step by step: an assistant turn is the
+reasoning text followed by the call blocks of that step, separated by blank
+lines, and the decoder returns the text outside the blocks as the reasoning.
+This is exact as long as the reasoning contains no block opener of the family,
+which the normalization of Section~\ref{sec:protocol} guarantees by moving
+every call out of the text channels. Two turn conventions absorb the final
+reasoning into the submission message (the shell family, and the plain-reply
+completion convention of $A_5$); we count them under $\simeq$. $\square$
+
+Two remarks. First, the composition $T_{h\to h'}=R_{h'}\circ P_h$ is defined
+on the image of $R_h$, so it is a total map between surfaces, and
+$P_{h'}\circ T_{h\to h'}=P_h$ on that image: transport preserves the action
+sequence exactly. Second, the observation channel is decorated rather than
+encoded: $A_4$ adds line-number gutters on file views, wrapper tags, and
+empty-output and error markers, all of which are stripped by the inverse
+decoration, and may truncate long outputs to a character budget. Truncation
+discards content by design, exactly as production harnesses do, which is why
+Proposition~1 is a statement about the action channel.
+
+\subsection{Premises, and what the measurement adds}
+\label{app:premises}
+
+(P1) and (P2) hold for every configuration the sampler produces. Tool names
+are drawn from synonym pools with rejection of a name already used in the
+configuration, and anonymized identifiers with the same rejection. For
+parameters, the synonym pools of any two keys that share a surface tool are
+pairwise disjoint, a static property of the name tables that we check
+mechanically, and anonymized parameter names are drawn with rejection. (P3)
+and (P4) are properties of the data: (P3) fails only if an argument value,
+such as the content of a file being written, itself contains a well-formed call
+in the configuration's own vocabulary; (P4) holds because the normalizer types
+every argument when it maps a harness call to a protocol action.
+
+The proof covers the design of the maps; the measurement of
+Table~\ref{tab:roundtrip} covers the implementation and the data. Rendering
+\numroundtrip{} real actions under randomly sampled configurations and parsing
+them back checks (a) that the code realizes the encodings described above and
+(b) that the corpus satisfies (P3) and (P4). Both hold: zero mismatches, with
+the $\simeq$ cases of the shell family ($89{,}930$ actions, $4.8\%$ of the
+total) counted as consistent but never as exact. A mechanical companion check exercises the encodings on adversarial
+values rather than real ones: $600$ sampled configurations across all
+families, each rendering $72$ actions whose arguments contain every family's
+delimiters, empty strings, outer whitespace and newlines, Unicode and
+$10{,}000$-character payloads, for $43{,}200$ render-parse pairs with zero
+mismatches. Four of the escape conditions of Lemma~3 (a path with outer
+whitespace or containing the terminator, a whitespace-only submission, a task
+list containing a block opener, a replace-all edit) were added as a result of
+this check; none of them occurs in the corpora of Table~\ref{tab:roundtrip}.
 
 \end{document}
