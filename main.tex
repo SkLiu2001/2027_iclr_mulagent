@@ -866,4 +866,311 @@ whitespace or containing the terminator, a whitespace-only submission, a task
 list containing a block opener, a replace-all edit) were added as a result of
 this check; none of them occurs in the corpora of Table~\ref{tab:roundtrip}.
 
+\section{What the trajectories show: a behavioural analysis}
+\label{app:analysis}
+
+Accuracy summarizes an episode in one bit. The trajectories behind this
+paper's cross-harness evaluations carry more: every tool call, the observation
+it produced, the tokens each step consumed, and how the episode ended. This
+appendix reads them. Two collections are used. The first is a models $\times$
+harnesses evaluation: six instruction-tuned models (Claude Opus 5, GPT-5.6,
+DeepSeek-V4-Pro, GLM-5.2, Qwen3.6-35B-A3B, Qwen3.5-27B) run under the four
+production harnesses and \cham{} (one fixed synthetic configuration) on the
+$500$ Verified and $300$ Multilingual tasks (Qwen3.5-27B on a $100+60$
+subset), $17{,}374$ completed episodes over $26$ model--harness cells;
+Figure~\ref{fig:ana-mix} marks the cells that could not be run. The second is
+the E1 pair of Section~\ref{sec:exp}, \method{} and its \control{}, on
+\claudecode{} (the source harness), \opencode{} and \openhands{}: $4{,}280$
+episodes. Every call is mapped to the protocol vocabulary with the parsers of
+Section~\ref{sec:protocol}, and shell commands are further labelled by intent
+(read, search, edit, run tests, other), so that a \texttt{sed -n} issued in
+\codexcli{} and a \texttt{Read} issued in \claudecode{} count as the same
+thing. Episodes that ended in an infrastructure exception are excluded from
+behavioural statistics, and one cell, Claude Opus 5 $\times$ \codexcli{}, is
+dropped entirely: $57\%$ of its episodes were cut short by an API-gateway
+error after two or three calls. The frontier models were reached through a
+gateway, so this appendix draws no conclusion from the absolute accuracy of
+any single API cell; the behavioural quantities below are robust to that.
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{pic/ana_action_mix.pdf}
+\end{center}
+\caption{The same model does the same semantic work in every harness. Each
+row is one model--harness cell; segments are the share of the cell's tool
+calls that read a file, search, edit, run tests, run other shell commands,
+plan or think, delegate or fetch the web, or finish, after normalization to
+the protocol vocabulary and intent-labelling of shell commands. Numbers are
+percentages; rows within a panel differ from one another about as much as the
+same row differs across panels.}
+\label{fig:ana-mix}
+\end{figure}
+
+\subsection{The semantic work is the same; the surface is not}
+
+Figure~\ref{fig:ana-mix} gives, for each model and harness, the mix of
+semantic actions after normalization. The rows within a panel are strikingly
+alike. Moving a model between harnesses shifts its action mix by a median
+Jensen--Shannon divergence of $0.025$ bits; moving between models under a
+fixed harness shifts it by $0.027$ bits. The harness, in other words, changes
+what a model does about as little as the choice of model does, and both
+changes are small. What does move is exactly what the harness makes explicit:
+planning calls exist only where a harness declares a task tracker
+(\texttt{TodoWrite} in \claudecode{} and \opencode{}, \texttt{task\_tracker}
+in \openhands{}), and a terminating call only where the harness requires one
+(\openhands{}, \cham{}). \codexcli{} is the one surface that visibly reshapes
+behaviour: with no first-class search tool, GPT-5.6 spends $38\%$ of its calls
+searching there against $13$--$25\%$ elsewhere, the exploration that a single
+\texttt{Grep} or \texttt{Glob} delivers in other harnesses being spread over
+several shell invocations.
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{pic/ana_phase.pdf}
+\end{center}
+\caption{Where in an episode each kind of call happens, pooled over the six
+models (episodes with at least ten calls, $n$ per panel). Every harness shows
+the same arc from exploration to editing to testing; harness conventions sit
+at the two ends, planning and delegation at the start where a harness offers
+them, an explicit finish at the end where a harness requires one.}
+\label{fig:ana-phase}
+\end{figure}
+
+Figure~\ref{fig:ana-phase} resolves the same calls over the course of an
+episode. Every harness shows one arc: reads and searches make up $70$--$90\%$
+of the first calls, editing grows through the middle, and testing rises toward
+the end. Conventions occupy the two ends. \claudecode{} and \opencode{} open
+with planning and delegation calls ($21\%$ and $18\%$ of the calls in the
+opening $5\%$ of an episode), \openhands{} and \cham{} close with an
+explicit finish ($26\%$ and $30\%$ of the calls in the closing $5\%$), and
+\codexcli{} opens with a search-dominated burst ($67\%$ of its opening
+calls). Below the conventions, the policy is the
+same.
+
+\subsection{What the harness does change: length and context}
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{pic/ana_episode_cost.pdf}
+\end{center}
+\caption{Episode length and context cost by harness. Per model (lines) and
+pooled over models (short bars): the median number of tool calls per episode,
+the median prompt tokens summed over an episode, and the median prompt tokens
+per call, a proxy for the context the model reads at each step. The same
+semantic work costs up to $3.4\times$ more tokens per call depending only on
+the surface.}
+\label{fig:ana-cost}
+\end{figure}
+
+\begin{table}[t]
+\caption{Per-harness summary, pooled over the six models (episodes with at
+least one call; \codexcli{} covers the three models that could be run under
+it). Tokens per call is the median over episodes of prompt tokens divided by
+calls. ``Rejected'' counts calls the harness refused before executing them,
+per $100$ calls; ``edit miss'' is the share of edit calls whose anchor text was
+not found in the file.}
+\label{tab:ana-summary}
+\begin{center}
+\begin{small}
+\begin{tabular}{lrrrrrrr}
+\toprule
+Harness & Episodes & Calls & Prompt tok. & Tok./call & Reads & Rejected & Edit miss \\
+\midrule
+\claudecode{}  & $3{,}304$ & $22$ & $741$k & $38.4$k & $31\%$ & $0.27$ & $5.0\%$ \\
+\opencode{}    & $4{,}084$ & $29$ & $569$k & $22.0$k & $33\%$ & $0.10$ & $1.9\%$ \\
+\openhands{}   & $4{,}064$ & $37$ & $864$k & $24.4$k & $28\%$ & $0.99$ & $0.6\%$ \\
+\codexcli{}    & $1{,}747$ & $23$ & $925$k & $36.9$k & $28\%$ & $0.11$ & $0.4\%$ \\
+\cham{}        & $4{,}031$ & $46$ & $487$k & $11.2$k & $36\%$ & $0.41$ & $1.6\%$ \\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{center}
+\end{table}
+
+If the harness leaves the semantic policy alone, what does it change?
+Figure~\ref{fig:ana-cost} and Table~\ref{tab:ana-summary} answer: how much the
+same work costs. Pooled over models, the median episode takes $22$ calls in
+\claudecode{} and $46$ in \cham{}, and the median prompt tokens per call
+range from $11$k in \cham{} to $38$k in \claudecode{}, a $3.4\times$
+difference for the same semantic actions. The per-call cost is set by the
+surface: the system prompt and tool documentation a harness prepends, the
+verbosity of its observations, and whether it compacts context.
+\claudecode{}'s $21$-tool schema and \codexcli{}'s shell-only surface, whose
+observations are raw command output, are the most expensive per call;
+\cham{}'s terse documentation and $2{,}000$-character observation cap are the
+cheapest. The two quantities can move in opposite directions: \cham{} takes
+the most calls but the fewest tokens per call, and its total episode cost is
+the lowest of all harnesses for four of the six models.
+
+\subsection{Interface dependence is a per-task phenomenon}
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{pic/ana_agreement.pdf}
+\end{center}
+\caption{Task-level agreement across harnesses, per model, over tasks with a
+settled outcome under every harness the model was run in ($K$ harnesses).
+(a)~Share of tasks solved under exactly $k$ of the $K$ harnesses; the number
+above each bar is the harness-dependent share, $0<k<K$. (b)~Pairwise Cohen's
+$\kappa$ between the sets of tasks two harnesses solve, averaged over the
+models that were run under both. (c)~Per model: tasks solved under every
+harness, under the best single harness (coloured by which), and under at
+least one; the label is the gap between the last two, in points.}
+\label{fig:ana-agree}
+\end{figure}
+
+A headline table reports one accuracy per harness; Figure~\ref{fig:ana-agree}
+asks whether the harnesses solve the \emph{same} tasks. They do not. Between
+$23\%$ (DeepSeek-V4-Pro) and $51\%$ (Qwen3.5-27B) of a model's tasks are
+harness-dependent, solved under some harnesses and not others
+(Figure~\ref{fig:ana-agree}a), and the agreement between any two harnesses on
+which tasks a model solves is only moderate, Cohen's $\kappa$ between $0.25$
+and $0.54$ (Figure~\ref{fig:ana-agree}b); \codexcli{} agrees least with the
+rest. Consequently an oracle that may pick the harness per task beats the best
+single harness by $2.1$ (GPT-5.6) to $11.9$ (Qwen3.6-35B-A3B) points
+(Figure~\ref{fig:ana-agree}c), and the gap widens as the model weakens. Part of
+this gap is the run-to-run variance a single harness would also show
+($\pm2.0$ points, Section~\ref{sec:exp}); the remainder is what the interface,
+not the task, decided. Two readings follow. The spread of a headline table
+understates interface dependence, since accuracies can agree while the solved
+sets do not; and the oracle gap bounds what a policy that is indifferent to
+the interface could recover.
+
+\subsection{Friction is a property of the harness, not of the model}
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{pic/ana_interface_errors.pdf}
+\end{center}
+\caption{Harness-reported interface errors by model and harness.
+(a)~Calls the harness refused before executing them: a tool that does not
+exist, malformed arguments, or a violated convention, per $100$ calls.
+(b)~Edit calls whose anchor text was not found in the file, as a share of edit
+calls. Both read down the columns: which harness a model is in predicts its
+friction better than which model it is.}
+\label{fig:ana-friction}
+\end{figure}
+
+Harnesses also differ in how often they refuse what the model says.
+Figure~\ref{fig:ana-friction} counts two classes of harness-reported error.
+Calls rejected before execution (Figure~\ref{fig:ana-friction}a) are rare
+everywhere except \openhands{}, where every model has its highest rate
+($0.7$--$1.7$ per $100$ calls). Of those rejections, $1{,}831$ across the six
+models carry the same message, ``Cannot execute multiple commands at once'', a
+convention no other harness has and every model violates. Edit calls whose
+anchor text is not found (Figure~\ref{fig:ana-friction}b) are highest under
+\claudecode{} for every model ($1.5$--$7.1\%$ of edits) and near zero under
+\openhands{} for the same models ($\le 1.5\%$): \claudecode{}'s \texttt{Edit}
+enforces a stricter contract than the others: a unique anchor ($504$ refusals
+for a missing and $82$ for an ambiguous one, over all models), a change that
+is not empty ($257$), and, counted in panel~(a), a read of the file before it
+is edited ($166$). Both panels
+read down the columns rather than across the rows. Friction is a property of
+the interface, and it is exactly the kind of property a surface-bound policy
+learns to avoid in one harness and then runs into in the next.
+
+\subsection{\method{} and the control off the source harness}
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{pic/ana_hint_behaviour.pdf}
+\end{center}
+\caption{Interface behaviour of \method{} and the \control{} on the source
+harness and on two unseen ones (E1 trajectories). (a)~Calls the harness
+refused, per $100$ calls, split into malformed arguments and calls to a tool
+that does not exist. (b)~Jensen--Shannon divergence between a model's semantic
+action mix on an unseen harness and its own mix on the source harness.
+(c)~How episodes end on \openhands{}, whose convention is an explicit finish
+call; both arms hit the wall clock often, which is why no \openhands{} accuracy
+enters a conclusion (Section~\ref{sec:limits}), but among the episodes that do
+not, \method{} follows the convention and the control does not.}
+\label{fig:ana-hint}
+\end{figure}
+
+Section~\ref{sec:exp} compares \method{} and its \control{} by accuracy. Their
+trajectories show what the accuracy is made of. On the source harness the two
+arms are alike: $1.1$ and $2.0$ rejected calls per $100$
+(Figure~\ref{fig:ana-hint}a), the same action mix, the same edit precision
+($24\%$ and $22\%$ of edits miss their anchor). Off the source harness they
+diverge. On \opencode{} the control's rejection rate rises to $5.1$ per $100$
+calls, $1.6$ of them calls to tools that do not exist, with names that belong
+to no harness (\texttt{bshell}, \texttt{browsetree}, \texttt{bqrtask});
+\method{}'s stays at $2.3$ with $0.1$ non-existent tools. On \openhands{} the
+rates are $2.9$ against $0.8$. The control also reads paths that do not exist
+six times as often on \opencode{} as \method{} does ($7.2$ against $1.2$ per
+$100$ calls; $0.14$ and $0.22$ on the source harness), and its edits miss
+their anchor more often ($32\%$ against $19\%$). Its semantic action mix
+moves away from its own source-harness behaviour by $0.027$ bits on
+\opencode{} where \method{}'s moves by $0.007$ (Figure~\ref{fig:ana-hint}b).
+The clearest signal is the completion convention
+(Figure~\ref{fig:ana-hint}c). \openhands{} expects an explicit finish call;
+\claudecode{}, the source harness, expects a plain reply. Among episodes that
+did not hit the wall clock, \method{} ends with the finish call $87\%$ of the
+time and the control $10\%$, the control instead stopping with a plain reply
+or running into the step limit, that is, carrying the source harness's
+convention into a harness that does not have it. Even on the source harness,
+the control runs into the four-hour wall clock in $53\%$ of episodes against
+$36\%$ for \method{}. These are the behaviours the accuracy in
+Table~\ref{tab:e1} averages over, and they are what interface invariance
+means at the level of a single call.
+
+\begin{figure}[t]
+\begin{footnotesize}
+\begin{verbatim}
+(1) Control on OpenHands SDK: the file editor called with the
+    argument schema of Claude Code's Bash tool
+    call     str_replace_editor
+             {"command": "grep -n \"def write\\|class Basic\"
+                          /testbed/astropy/io/ascii/basic.py | head -30",
+              "description": ""}
+    harness  ERROR: flag provided but not defined: -description
+
+(2) Control on OpenCode: a tool that no harness declares
+    call     bshell {...}
+    harness  Model tried to call unavailable tool 'bshell'.
+             Available tools: bash, edit, glob, grep, invalid, read,
+             skill, task, todowrite, webfetch, write.
+
+(3) Qwen3.5-27B on Codex CLI: a memorized call template emitted as
+    text on the second turn, after one structured call to `shell`
+    model    user
+             <tool_call>
+             <function=exec_command>
+             <parameter=cmd>
+             find /testbed -type f -name "python.py" | grep domain
+             </parameter>
+             </function>
+             </tool_call>
+    harness  (no call parsed; the text is taken as the final answer
+             and the episode ends)
+\end{verbatim}
+\end{footnotesize}
+\caption{Three interface failures, verbatim. (1)~The control applies the
+argument schema of its source harness's shell tool (\texttt{command} plus
+\texttt{description}) to a different harness's file editor. (2)~It names a
+tool that exists nowhere. (3)~An instruction-tuned model, after one correct
+structured call, falls back to a call template it memorized, naming
+\texttt{exec\_command}, the shell entry point of the \codexcli{} release in
+our parsed corpus (Table~\ref{tab:harnesses}), inside its own text markup;
+the release under evaluation exposes the shell as \texttt{shell} and accepts
+only structured calls, so the episode ends. $47$ of Qwen3.5-27B's $81$ failed
+\codexcli{} episodes end this way.}
+\label{fig:ana-examples}
+\end{figure}
+
+Figure~\ref{fig:ana-examples} shows three of these failures verbatim. The
+first two are the control's: it calls \openhands{}'s file editor with the
+argument schema of \claudecode{}'s \texttt{Bash} tool, and it calls tools that
+exist nowhere. The third is not from the E1 arms but from an instruction-tuned
+model in the models $\times$ harnesses evaluation, and it is the purest form
+of interface reliance we observed: after one correct structured call, the
+model emits, as text, a call template it learned somewhere else, with a tool
+name from a different release of the same harness. The harness in front of it
+has told it, in the system prompt, what its tools are called and how to call
+them; the memorized surface wins anyway. $47$ of the model's $81$ failed
+\codexcli{} episodes end on such a line, after a median of one call. This is
+the failure that \method{} is designed to remove, and the reason the
+anonymized tier of Section~\ref{sec:method} exists: a model that has learned
+to read the tool documentation in front of it has nothing to fall back on.
+
 \end{document}
