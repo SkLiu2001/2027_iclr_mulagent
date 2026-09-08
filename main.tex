@@ -217,22 +217,8 @@ harnesses, we factor the surface into five axes,
 with $A_1$ tool granularity and naming, $A_2$ call syntax, $A_3$ system-prompt
 template and tool-documentation style, $A_4$ observation formatting, and $A_5$
 turn and completion conventions. A harness is a point $h \in \mathcal{H}$;
-sampling a point is sampling a synthetic harness. Figure~\ref{fig:orbit}
-shows one protocol trajectory under three such points.
-
-\begin{figure}[t]
-\begin{center}
-\includegraphics[width=\textwidth]{pic/intro_hint_protocol_geometry_v4.pdf}
-\end{center}
-\caption{One protocol trajectory and three of its surfaces. Parsing the source
-trajectory ($P_A$) yields $\tau = [(c_t, a_t, o_t)]$; rendering it under two
-other configurations, one with synthetic tool names ($R_B$) and one with
-anonymized identifiers ($R_C$), produces counterfactual harnesses that never
-existed but carry the same episode. Proposition~1 states that every such
-surface parses back to the same $\tau$: the content of the episode is
-preserved and only the surface changes.}
-\label{fig:orbit}
-\end{figure}
+sampling a point is sampling a synthetic harness (Appendix~\ref{app:orbit}
+illustrates one trajectory under three such points).
 
 \paragraph{Proposition 1 (round-trip exactness).} \emph{For every
 $h \in \mathcal{H}$ realized by our renderer there is a parser $P_h$ with
@@ -629,9 +615,10 @@ realizes is exactly invertible on the action channel. The proof is by
 construction: the renderer is a composition of two stages, and each stage is
 shown to have a left inverse. Section~\ref{app:setting} fixes notation,
 Sections~\ref{app:naming}--\ref{app:shell} prove one lemma per stage,
-Section~\ref{app:theorem} assembles them, and Section~\ref{app:premises}
+Section~\ref{app:theorem} assembles them, Section~\ref{app:premises}
 lists the premises and states precisely what the measurement of
-Table~\ref{tab:roundtrip} adds to the proof.
+Table~\ref{tab:roundtrip} adds to the proof, and Section~\ref{app:orbit}
+illustrates the construction on one trajectory.
 
 \subsection{Setting}
 \label{app:setting}
@@ -880,6 +867,35 @@ mismatches. Four of the escape conditions of Lemma~3 (a path with outer
 whitespace or containing the terminator, a whitespace-only submission, a task
 list containing a block opener, a replace-all edit) were added as a result of
 this check; none of them occurs in the corpora of Table~\ref{tab:roundtrip}.
+
+\subsection{One trajectory, three surfaces}
+\label{app:orbit}
+
+Figure~\ref{fig:orbit} makes the construction concrete on a single episode.
+The source harness is parsed ($P_A$) into protocol form
+$\tau = [(c_t, a_t, o_t)]$; the same $\tau$ is then rendered under two other
+configurations, one that draws synthetic tool names ($R_B$) and one that
+replaces every identifier with an anonymized token ($R_C$). Neither
+counterfactual surface ever existed as a harness, yet each carries the same
+reasoning, the same actions and the same observations as the source, differing
+only in the text that wraps them. Proposition~1 is the statement that all
+three surfaces parse back to the same $\tau$: the three panels are three
+points on the orbit of one trajectory under $\mathcal{H}$, and the training
+set of Section~\ref{sec:method} is built from such orbits.
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{pic/intro_hint_protocol_geometry_v4.pdf}
+\end{center}
+\caption{One protocol trajectory and three of its surfaces. Parsing the source
+trajectory ($P_A$) yields $\tau = [(c_t, a_t, o_t)]$; rendering it under two
+other configurations, one with synthetic tool names ($R_B$) and one with
+anonymized identifiers ($R_C$), produces counterfactual harnesses that never
+existed but carry the same episode. Proposition~1 states that every such
+surface parses back to the same $\tau$: the content of the episode is
+preserved and only the surface changes.}
+\label{fig:orbit}
+\end{figure}
 
 \section{What the trajectories show: a behavioural analysis}
 \label{app:analysis}
