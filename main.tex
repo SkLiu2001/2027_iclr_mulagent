@@ -217,7 +217,22 @@ harnesses, we factor the surface into five axes,
 with $A_1$ tool granularity and naming, $A_2$ call syntax, $A_3$ system-prompt
 template and tool-documentation style, $A_4$ observation formatting, and $A_5$
 turn and completion conventions. A harness is a point $h \in \mathcal{H}$;
-sampling a point is sampling a synthetic harness.
+sampling a point is sampling a synthetic harness. Figure~\ref{fig:orbit}
+shows one protocol trajectory under three such points.
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{pic/intro_hint_protocol_geometry_v4.pdf}
+\end{center}
+\caption{One protocol trajectory and three of its surfaces. Parsing the source
+trajectory ($P_A$) yields $\tau = [(c_t, a_t, o_t)]$; rendering it under two
+other configurations, one with synthetic tool names ($R_B$) and one with
+anonymized identifiers ($R_C$), produces counterfactual harnesses that never
+existed but carry the same episode. Proposition~1 states that every such
+surface parses back to the same $\tau$: the content of the episode is
+preserved and only the surface changes.}
+\label{fig:orbit}
+\end{figure}
 
 \paragraph{Proposition 1 (round-trip exactness).} \emph{For every
 $h \in \mathcal{H}$ realized by our renderer there is a parser $P_h$ with
