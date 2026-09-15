@@ -25,7 +25,7 @@
 \newcommand{\chr}{\textsc{Chr}}
 \newcommand{\cham}{\textsc{Chameleon}}
 % models
-\newcommand{\basemodel}{Qwen3-30B-A3B-Instruct-2507}
+\newcommand{\basemodel}{Qwen3.6-35B-A3B}
 % benchmarks
 \newcommand{\swev}{SWE-bench Verified}
 \newcommand{\swem}{SWE-bench Multilingual}
@@ -33,20 +33,21 @@
 \newcommand{\claudecode}{Claude Code}
 \newcommand{\opencode}{OpenCode}
 \newcommand{\codexcli}{Codex CLI}
+\newcommand{\hdr}[2]{\begin{tabular}[b]{@{}r@{}}#1\\#2\end{tabular}}  % two-line column header
 \newcommand{\openhands}{OpenHands SDK}   % the harness the code calls r2e-gym is an internal OpenHands SDK build; the paper describes OpenHands SDK by its current tool surface (terminal / file_editor / task_tracker / finish)
 % baseline
-\newcommand{\control}{compute-matched control}
+\newcommand{\control}{step-matched control}
 % headline measurements (single source of truth)
 \newcommand{\numactions}{578{,}856}       % semantic actions across 5 harnesses
 \newcommand{\numtraj}{9{,}873}            % trajectories parsed
 \newcommand{\numroundtrip}{1.87M}         % actions in the round-trip check
 \newcommand{\rtacc}{100.0000\%}           % round-trip consistency
-\newcommand{\numsurfaces}{8{,}204}        % distinct surface configs in training
+\newcommand{\numsurfaces}{26{,}031}       % distinct surface configs in training (one per rendered sample)
 % utilities
 \newcommand{\todo}[1]{\textcolor{red}{[#1]}}
 
-\title{Learning the Harness Protocol\\
-Interface-Invariant Training for SWE Agents}
+\title{HINT: Learning the Harness Protocol for\\
+Interface-Invariant SWE Agents}
 
 \author{Anonymous Authors \\
 Affiliation \\
@@ -72,8 +73,8 @@ These agents interact with repositories
 through a \emph{harness} that defines their tools, call syntax, and
 observations. As a result, an agent trained in one harness can overfit to its
 interface and degrade when deployed in another: holding the model and tasks
-fixed, changing only the harness shifts \swev{} accuracy by $9.2$ points. We
-find that this variation is largely superficial. Across four production
+fixed, changing only the harness shifts \swev{} accuracy by up to $9.0$ points.
+We find that this variation is largely superficial. Across four production
 harnesses, diverse tool interfaces reduce to a shared set of only $12$ semantic
 actions. We formalize this common action space as the \HP{} and develop
 semantics-preserving transformations between the protocol and concrete
@@ -82,11 +83,12 @@ actions. Building on this representation, we introduce \method{}
 (Harness-INvariant Training), which re-renders each training trajectory under
 counterfactual harness interfaces and anonymizes interface-specific cues,
 encouraging the model to learn action semantics rather than memorize tool
-conventions. Under compute-matched training, \method{} reduces the accuracy
-lost on an unseen harness from $10.4$ to $4.7$ points and improves accuracy by
-$7.7$ points when both the harness and the programming languages are unseen.
-These results suggest that harness variation need not be a fundamental source
-of distribution shift for SWE agents.
+conventions. Against a control fine-tuned on the same trajectories in their
+original harness for the same number of steps, \method{} is no worse on that
+harness, is ahead under every unseen production harness by up to $8.7$ points,
+and narrows the \swem{} accuracy range across five harnesses from $7.4$ to
+$1.6$ points. These results suggest that harness variation need not be a
+fundamental source of distribution shift for SWE agents.
 \end{abstract}
 
 \section{Introduction}
@@ -109,9 +111,10 @@ or \texttt{read} or \texttt{file\_editor} with
 \texttt{command="view"}, whether output carries line numbers, and whether an
 episode ends with a \texttt{finish} call or a plain reply. These are
 presentational choices, and one would like them not to matter. They do.
-Evaluating a single instruction-tuned model on a single task set and changing
-\emph{only} the harness (Table~\ref{tab:e0}), \swev{} accuracy ranges from
-$16.0\%$ to $25.2\%$, a $9.2$-point spread produced by nothing but the wrapper.
+Evaluating an instruction-tuned model on a single task set and changing
+\emph{only} the harness (Table~\ref{tab:e0}), \swev{} accuracy moves by up to
+$9.0$ points, from $58.6\%$ to $67.6\%$ for Qwen3.5-35B-A3B across five
+harnesses, a spread produced by nothing but the wrapper.
 
 The gap has a simple origin. Agent training data is collected inside whichever
 harness the data pipeline uses, and supervised fine-tuning on that data teaches
@@ -121,6 +124,11 @@ untruncated output becomes as much a part of the learned policy as the decision
 to run the test suite before editing. Deployment in a different harness then
 presents a distribution shift that is, from the model's perspective,
 indistinguishable from a change of task (Figure~\ref{fig:overview}, left).
+The effect is measurable: fine-tuning Qwen3.6-35B-A3B on \claudecode{}
+trajectories raises its \claudecode{} accuracy on \swev{} from $69.0\%$ to
+$78.4\%$ but leaves its \codexcli{} accuracy where it was ($68.0\%$ before,
+$66.7\%$ after), widening its spread across harnesses from $3.4$ to $11.7$
+points (Section~\ref{sec:exp}).
 
 \begin{figure}[t]
 \begin{center}
@@ -169,17 +177,21 @@ and no architectural change.
 
 We fine-tune \basemodel{} on \claudecode{} trajectories and evaluate under real
 harnesses that training never showed as coherent wholes, against a \control{}
-that sees the same trajectories the same number of times in their original
-harness. \method{} reduces the accuracy lost when the model is moved to an
-unseen harness from $10.4$ to $4.7$ points on \swem{}, and gains $7.7$ points
-when both the harness and the programming languages are unseen. Together, these
+trained on the same trajectories in their original harness for the same number
+of optimizer steps. On the source harness \method{} is no worse than the
+control. Under each of the three unseen production harnesses it is ahead on
+both benchmarks, by up to $8.7$ points; its worst harness scores $75.4\%$ on
+\swev{} against the control's $66.7\%$, and on \swem{} its accuracy varies by
+$1.6$ points across five harnesses against the control's $7.4$. Together, these
 results reframe harness variation: it is not a property of the task that a
 model must absorb, but a nuisance factor that a training pipeline can
 marginalize over. Our contributions are summarized as follows:
 \begin{itemize}
-\item \textbf{A measurement.} Harness choice alone moves \swev{} by
-  $9.2$ points for a fixed model and task set, and the harness that does worst
-  is not the one with the fewest tools (Section~\ref{sec:exp}).
+\item \textbf{A measurement.} Harness choice alone moves \swev{} by up to
+  $9.0$ points for a fixed model and task set; the harness that does worst
+  is not the one with the fewest tools, the size of the spread is a
+  property of the model, and fine-tuning on one harness widens it
+  (Section~\ref{sec:exp}).
 \item \textbf{The \HP{}, with an exactness guarantee that is measured rather
   than assumed.} A $12$-action vocabulary covers $99.96\%$ of \numactions{} real
   calls from four harnesses; surface rendering is exactly invertible on
@@ -187,10 +199,11 @@ marginalize over. Our contributions are summarized as follows:
 \item \textbf{\method{}}, a training method that multiplies existing
   trajectories along the surface axes, needing no new task data and no
   architecture change (Section~\ref{sec:method}).
-\item \textbf{A compute-matched evaluation.} Against a control that sees the
-  same trajectories the same number of times in their original harness,
-  \method{} more than halves the cross-harness loss on \swem{}
-  (Section~\ref{sec:exp}).
+\item \textbf{A step-matched evaluation.} Against a control trained on the
+  same trajectories in their original harness for the same number of steps,
+  \method{} is ahead under all three unseen production harnesses on both
+  benchmarks and narrows the \swem{} range across five harnesses from $7.4$ to
+  $1.6$ points (Section~\ref{sec:exp}).
 \end{itemize}
 
 \section{The Harness Protocol}
@@ -412,121 +425,175 @@ arbitrary synthetic harnesses.
 \subsection{Setup}
 
 \paragraph{Model and data.} We fine-tune \basemodel{}
-\citep{qwen3} on $5{,}000$ \claudecode{} trajectories over SWE tasks. After
-dropping trajectories containing unmapped tools or fewer than three semantic
-actions, $4{,}133$ remain; \chr{} renders each into $M=2$ counterfactual
-surfaces, yielding $8{,}266$ samples that instantiate $\numsurfaces{}$ distinct surface
-configurations and $11{,}205$ distinct tool names. All runs use $215$ optimizer
-steps, global batch $32$, learning rate $5\times10^{-5}$, and a $256$K context.
+\citep{qwen3} on $9{,}366$ \claudecode{} trajectories over SWE tasks, one per
+task instance. After dropping trajectories containing unmapped tools or fewer
+than three semantic actions, $8{,}677$ remain; \chr{} renders each into $M=3$
+counterfactual surfaces, yielding $\numsurfaces{}$ samples, each under its own
+surface configuration, with $21{,}476$ distinct tool names; $30\%$ of samples
+are anonymized. \method{} trains on these rendered samples alone. Both runs are
+full-parameter fine-tuning with a global batch of $128$ packed sequences of up
+to $256$K tokens, learning rate $5\times10^{-5}$ with cosine decay, and $67$
+optimizer steps.
 
-\paragraph{The control that matters.} A mixture of real and \chr{} data contains
-more tokens than the real data alone, so any gain could be bought by extra
-optimization rather than by surface diversity. We therefore train a
-\emph{compute-matched} control: the same real trajectories only, run for exactly
-the same $215$ optimizer steps (about $6.2$ passes over the data) with an
-identical schedule; the two runs' training scripts differ in two lines. Matching
-\emph{sample counts} instead would have given the control $27\%$ more tokens,
-since \chr{} samples are $34\%$ shorter than the originals.
+\paragraph{The control that matters.} Rendering multiplies the data: the
+rendered set holds about $1.7\times$ the tokens of the original trajectories,
+so a gain could be bought by extra optimization rather than by surface
+diversity. We therefore match optimizer steps. The \control{} trains on the
+original \claudecode{} trajectories for three epochs, which is $67$ steps;
+\method{} trains for the same $67$ steps, about $1.8$ passes over its rendered
+set. With sequence packing, equal steps at an equal batch size are also
+approximately equal training tokens. The two runs differ only in their data:
+the control sees each trajectory three times in its original surface, and
+\method{} sees it in three different surfaces, none of which is
+\claudecode{}'s own.
 
-\paragraph{Evaluation.} We report \swev{} ($500$ tasks) and \swem{} ($300$ tasks), each executed under three real harnesses: \claudecode{} (the source harness), \opencode{} and \openhands{} (both unseen during training).
-Repeated submissions of an identical configuration give a run-to-run noise floor
-of $\pm2.0$ points on the $500$-task set and $\pm1.0$ points on the $300$-task
-set; differences below these are not interpretable.
+\paragraph{Evaluation.} We report \swev{} ($500$ tasks) and \swem{} ($300$
+tasks) under the four production harnesses of Table~\ref{tab:harnesses} and
+under \cham{} with one fixed configuration, with all models served by vLLM on
+one serving stack. For the models of E1, \claudecode{} is the source harness;
+\opencode{}, \openhands{} and \codexcli{} are unseen as harnesses, though not
+all as vocabularies: \chr{}'s name pool excludes \openhands{}'s tool names,
+while \opencode{}'s occur, recombined with others, in $33\%$ of rendered
+samples and \codexcli{}'s in $21\%$ (Section~\ref{sec:limits}). \cham{}'s
+configuration is drawn from the space \chr{} samples from: it is new to both
+models, but of a kind \method{} was trained on. E0 additionally runs three
+open-weight models, Qwen3.5-35B-A3B, Qwen3.6-35B-A3B and KAT-Coder-V2.5-Dev.
+Each E1 cell is the mean of three evaluations; E0 cells are single evaluations.
+The task images retain the repository's later git history, and an agent can
+download the upstream patch when the sandbox has network access; in E0, an
+episode in which the agent obtained the reference fix in either way is scored
+as a failure whatever the verifier says (at most $3.2$ points of a Verified
+cell and $9.3$ points of a Multilingual cell). \todo{apply the same audit to
+the E1 cells} Repeated submissions of an identical configuration give a
+single-evaluation noise floor of $\pm2.0$ points on the $500$-task set and
+$\pm1.0$ points on the $300$-task set; differences below these are not
+interpreted.
 
 \subsection{E0: harness choice alone moves accuracy}
 
 \begin{table}[t]
-\caption{The same instruction-tuned model, the same tasks, three harnesses.}
+\caption{Harness choice alone moves accuracy. Three open-weight models under
+the four production harnesses and \cham{} (one fixed configuration): pass@1
+(\%) on \swev{} (V, $500$ tasks) and \swem{} (M, $300$ tasks), one evaluation
+per cell. Spread is max minus min over the five harnesses. Qwen3.6-35B-A3B is
+also the base model of E1.}
 \label{tab:e0}
 \begin{center}
-\begin{small}
-\begin{tabular}{lrr}
+\begin{footnotesize}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llrrrrrr}
 \toprule
-Harness & \swev{} & \swem{} \\
+Model & & \hdr{Claude}{Code} & \hdr{Open-}{Code} & \hdr{OpenHands}{SDK} & \hdr{Codex}{CLI} & \hdr{}{\cham{}} & Spread \\
 \midrule
-\claudecode{} & $25.2\%$ & $14.7\%$ \\
-\openhands{} & $22.2\%$ & $\phantom{0}9.0\%$ \\
-\opencode{}    & $16.0\%$ & $13.3\%$ \\
-\midrule
-Spread      & $\mathbf{9.2}$ pts & $5.7$ pts \\
+Qwen3.5-35B-A3B    & V & $64.2$ & $66.4$ & $67.6$ & $58.6$ & $67.2$ & $9.0$ \\
+                   & M & $54.7$ & $54.3$ & $58.3$ & $49.7$ & $55.0$ & $8.6$ \\
+Qwen3.6-35B-A3B    & V & $69.0$ & $71.4$ & $71.0$ & $68.0$ & $70.8$ & $3.4$ \\
+                   & M & $62.3$ & $68.3$ & $64.3$ & $61.3$ & $62.3$ & $7.0$ \\
+KAT-Coder-V2.5-Dev & V & $69.4$ & $69.8$ & $68.8$ & $68.6$ & $67.2$ & $2.6$ \\
+                   & M & $57.3$ & $58.7$ & $60.3$ & $59.3$ & $60.0$ & $3.0$ \\
 \bottomrule
 \end{tabular}
-\end{small}
+\end{footnotesize}
 \end{center}
 \end{table}
 
 Table~\ref{tab:e0} establishes the phenomenon the method addresses. The ordering
-is not explained by tool count or interface simplicity: \opencode{}, whose eleven
-split tools most closely resemble a typical instruction-tuning distribution, is
-the worst of the three on Verified.
+is not explained by tool count or interface simplicity: \codexcli{}, which
+declares thirteen tools but routes every action through a shell, is the lowest
+of the four production harnesses on Verified for all three open-weight models,
+while \openhands{}, with four tools, is the best or second best harness for the
+two Qwen models. The size of the spread is a property of the model: $9.0$
+points for Qwen3.5-35B-A3B, $3.4$ for Qwen3.6-35B-A3B and $2.6$ for
+KAT-Coder-V2.5-Dev on Verified, in the same order on Multilingual ($8.6$,
+$7.0$, $3.0$). KAT-Coder-V2.5-Dev, a model post-trained for agentic coding, is
+close to interface-invariant already; \method{} aims to obtain the same property
+from the training data alone.
 
-\subsection{E1: \method{} versus a compute-matched control}
+\subsection{E1: \method{} versus a step-matched control}
 
 \begin{table}[t]
-\caption{\method{} (real $+$ \chr{}) versus the compute-matched control (real
-data repeated to the same $215$ steps). Cells marked $\dagger$ are still running
-and are reported over settled trials only. The noise floor is $\pm2.0$ points on
-Verified and $\pm1.0$ on Multilingual.}
+\caption{\method{} versus the \control{}, both fine-tuned from \basemodel{}
+for $67$ steps: pass@1 (\%) under the source harness, three unseen production
+harnesses and \cham{}. Fine-tuned cells are means of three evaluations; the
+base row is the single E0 evaluation. $\Delta$ is \method{} minus control.
+Worst is the lowest of the five harnesses and spread is max minus min. Bold
+marks the better fine-tuned model (the lower, for spread). The
+single-evaluation noise floor is $\pm2.0$ (V) and $\pm1.0$ (M).}
 \label{tab:e1}
 \begin{center}
-\begin{small}
-\begin{tabular}{llrrr}
+\begin{footnotesize}
+\setlength{\tabcolsep}{3.6pt}
+\begin{tabular}{llrrrrrrrr}
 \toprule
-Harness & Benchmark & Control & \method{} & $\Delta$ \\
+ & & \hdr{Claude Code}{(source)} & \hdr{Open-}{Code} & \hdr{OpenHands}{SDK} & \hdr{Codex}{CLI} & \hdr{}{\cham{}} & Mean & Worst & Spread \\
 \midrule
-\claudecode{} (source) & Multilingual & $33.7\%$ & $35.7\%$ & $+2.0$ \\
-\claudecode{} (source) & Verified     & $51.6\%^\dagger$ & $48.2\%$ & $-3.4^\dagger$ \\
-\opencode{} (unseen)    & Verified     & $43.0\%$ & $42.0\%$ & $-1.0$ \\
-\opencode{} (unseen)    & Multilingual & $23.3\%$ & $\mathbf{31.0\%}$ & $\mathbf{+7.7}$ \\
+V & Base      & $69.0$ & $71.4$ & $71.0$ & $68.0$ & $70.8$ & $70.0$ & $68.0$ & $3.4$ \\
+  & Control   & $78.4$ & $74.3$ & $77.2$ & $66.7$ & $\mathbf{78.4}$ & $75.0$ & $66.7$ & $11.7$ \\
+  & \method{} & $\mathbf{78.6}$ & $\mathbf{77.1}$ & $\mathbf{81.7}$ & $\mathbf{75.4}$ & $75.6$ & $\mathbf{77.7}$ & $\mathbf{75.4}$ & $\mathbf{6.3}$ \\
+  & $\Delta$  & $+0.2$ & $+2.8$ & $+4.5$ & $+8.7$ & $-2.8$ & $+2.7$ & $+8.7$ & $-5.4$ \\
+\midrule
+M & Base      & $62.3$ & $68.3$ & $64.3$ & $61.3$ & $62.3$ & $63.7$ & $61.3$ & $7.0$ \\
+  & Control   & $68.7$ & $71.9$ & $71.7$ & $66.0$ & $73.4$ & $70.3$ & $66.0$ & $7.4$ \\
+  & \method{} & $\mathbf{75.0}$ & $\mathbf{73.4}$ & $\mathbf{74.0}$ & $\mathbf{73.4}$ & $\mathbf{74.4}$ & $\mathbf{74.0}$ & $\mathbf{73.4}$ & $\mathbf{1.6}$ \\
+  & $\Delta$  & $+6.3$ & $+1.5$ & $+2.3$ & $+7.4$ & $+1.0$ & $+3.7$ & $+7.4$ & $-5.8$ \\
 \bottomrule
 \end{tabular}
-\end{small}
+\end{footnotesize}
 \end{center}
 \end{table}
 
-\begin{table}[t]
-\caption{Accuracy lost when the same model is moved from the source harness to
-an unseen one. \method{} more than halves the cost of the move on Multilingual.}
-\label{tab:transport}
+\begin{figure}[t]
 \begin{center}
-\begin{small}
-\begin{tabular}{lrr}
-\toprule
-Benchmark & Control & \method{} \\
-\midrule
-Multilingual (\claudecode{} $\to$ \opencode{}) & $-10.4$ pts & $\mathbf{-4.7}$ pts \\
-Verified (\claudecode{} $\to$ \opencode{})     & $\phantom{0}-8.6$ pts$^\dagger$ & $-6.2$ pts \\
-\bottomrule
-\end{tabular}
-\end{small}
+\includegraphics[width=\textwidth]{pic/e1_step_matched.pdf}
 \end{center}
-\end{table}
+\caption{Table~\ref{tab:e1} by harness. Each row places the base model (open
+diamond), the control (grey square) and \method{} (orange circle); the bar
+joins the two fine-tuned models, and the number to its right is \method{} minus
+control, grey when within the single-evaluation noise floor. On Verified the
+control's gain over the base model is largest on its source harness and
+vanishes on \codexcli{}; \method{}'s gain is spread across harnesses, and on
+Multilingual its five accuracies lie within $1.6$ points.}
+\label{fig:e1}
+\end{figure}
 
-Two readings of Table~\ref{tab:e1} are available and they say different things.
-Read as absolute accuracy, the only difference outside the noise floor is the
-unseen-harness, unseen-language cell, where \method{} gains $7.7$ points
-($93/300$ versus $70/300$; two-proportion $z \approx 2.11$, $p \approx 0.035$);
-on Verified the two arms are tied. The second reading, \emph{transport cost} (Table~\ref{tab:transport}), asks how
-much accuracy the same model loses when moved off its source harness: \method{}
-more than halves the loss on Multilingual and reduces it on Verified, and this
-reading is insensitive to which arm has the higher absolute score.
+Table~\ref{tab:e1} and Figure~\ref{fig:e1} give the result. Both fine-tuned
+models improve on the base model on average, the control by $5.0$ points on
+Verified and $6.6$ on Multilingual, \method{} by $7.6$ and $10.3$. Where the
+control's gain lands is the problem of Section~\ref{sec:intro} in miniature.
+On Verified it gains $9.4$ points under \claudecode{}, the harness its data came
+from, $2.9$ under \opencode{}, and nothing under \codexcli{} ($68.0\%$ before
+fine-tuning, $66.7\%$ after), so its spread across harnesses grows from $3.4$
+to $11.7$ points. Fine-tuning on one harness bought accuracy on that harness
+and made the model more dependent on it.
 
-The two benchmarks disagree, and we take the disagreement seriously rather than
-averaging it away. Multilingual consistently favours \method{}; Verified shows
-no effect. A hypothesis we can state but have not yet tested is that Verified is
-Python-only and heavily represented in pre-training, so a model retains enough
-memorized prior to recover from an unfamiliar surface, whereas Multilingual's
-non-Python repositories force reliance on reading the interface, precisely the capability \chr{}
-trains. If this holds, low-prior task distributions are the
-regime where interface invariance pays, and evaluation emphasis should move
-there.
+\method{} gives up nothing on the source harness, $78.6\%$ against $78.4\%$ on
+Verified and $75.0\%$ against $68.7\%$ on Multilingual, although it never
+trained on \claudecode{}'s own surface. Under the three unseen production
+harnesses it is ahead on both benchmarks, by $2.8$, $4.5$ and $8.7$ points on
+Verified and by $1.5$, $2.3$ and $7.4$ on Multilingual. The largest gap is under
+\codexcli{}, whose shell-only surface lies outside the granularities \chr{}
+renders. The advantage is therefore largest where the control is weakest:
+\method{}'s worst harness is $8.7$ points (Verified) and $7.4$ points
+(Multilingual) above the control's, and on Multilingual its five accuracies lie
+within $1.6$ points ($73.4$--$75.0\%$), a tighter range than the base model's
+own $7.0$. Against the single-evaluation noise floor, \method{} is ahead in
+seven of the ten cells, level in two (\claudecode{} on Verified, \cham{} on
+Multilingual), and behind in one.
+
+That one cell is \cham{} on Verified, where the control leads by $2.8$ points
+($78.4\%$ against $75.6\%$). \cham{}'s configuration comes from the space
+\method{}'s training surfaces were sampled from, so this is not a failure to
+reach an unseen surface of the kind the other columns measure, and we do not
+have an explanation for it. An earlier run of the same comparison on a weaker
+base model with a different recipe is reported in Appendix~\ref{app:e1-30b};
+there \method{}'s advantage appeared on Multilingual only.
 
 \subsection{Planned ablations}
 
-The compute-matched control rules out ``more gradient steps''. It does not
+The step-matched control rules out ``more gradient steps''. It does not
 separate the contribution of surface \emph{diversity} from that of merely
 \emph{changing} the surface once. The decisive ablation renders the same
-$4{,}133$ trajectories into the same number of samples at the same token count
+$8{,}677$ trajectories into the same number of samples at the same token count
 but draws a \emph{single} fixed configuration instead of $\numsurfaces{}$; a sweep over
 the number of distinct surfaces then yields an accuracy-versus-diversity curve.
 \todo{running; results to be added}
@@ -534,27 +601,25 @@ the number of distinct surfaces then yields an accuracy-versus-diversity curve.
 \section{Limitations}
 \label{sec:limits}
 
-\paragraph{Preliminary evidence.} One of six evaluation cells is significant
-against the noise floor and two cells are still executing. We report the
-incomplete cells rather than omitting them.
+\paragraph{Strength of evidence.} Each E1 cell averages three evaluations, but
+we compare the two models against a noise floor rather than with per-task
+paired tests, and each model is a single training run. One of the ten cells
+favours the control beyond the noise floor. \todo{paired per-task tests; leak
+audit of the E1 cells}
 
-\paragraph{\openhands{} results are unusable.} Both arms time out on \openhands{} at high
-rates ($25\%$ and $64\%$ of settled trials), traced to a proactive-compaction
-threshold set above the context length actually reached, so per-step prefill
-grows until the wall clock is exhausted. Until the threshold is corrected and
-both arms re-run, no \openhands{} number enters a conclusion. We note, as a
-hypothesis rather than a result, that the control times out $2.5\times$ more
-often than \method{} under an identical evaluation configuration, which would be
-a behavioural generalization signal that accuracy alone does not capture.
+\paragraph{Unseen harnesses are not all unseen vocabularies.} \chr{}'s first
+naming tier harvests real tool names from the parsed harnesses and recombines
+them. Of the $\numsurfaces{}$ rendered samples, $33\%$ carry at least one
+\opencode{} tool name and $21\%$ at least one \codexcli{} name; none carries an
+\openhands{} name, because that harness's names are excluded from the pool, and
+none presents any of the three as a coherent harness. \openhands{} is therefore
+the strictly zero-shot column of Table~\ref{tab:e1}; excluding each held-out
+harness's names in turn would make the others so.
 
-\paragraph{\opencode{} is not strictly zero-shot.} \chr{}'s first naming tier
-harvests real tool names from all parsed harnesses, \opencode{} included. The
-\method{} arm therefore saw \opencode{}'s \emph{vocabulary} recombined into
-synthetic harnesses, though never \opencode{} as a coherent harness. A strict
-zero-shot arm requires excluding the held-out harness's names from the pool.
-
-\paragraph{Single model, single source harness.} All results use one base model
-and trajectories from one source harness. Whether the effect scales with model
+\paragraph{One model family, one source harness.} The main results use one
+base model; an earlier run on Qwen3-30B-A3B-Instruct-2507
+(Appendix~\ref{app:e1-30b}) agrees on Multilingual but not on Verified. All
+trajectories come from one source harness. Whether the effect scales with model
 size, or holds when the source harness is \codexcli{}'s shell-only surface,
 remains open.
 
@@ -598,8 +663,9 @@ actions covering $99.96\%$ of $\numactions{}$ real calls. Making that core expli
 as the \HP{}, and verifying that the surface map is exactly invertible over
 \numroundtrip{} actions, turns interface variation into something a training pipeline
 can marginalize over. \method{} does so with no new task data and no
-architectural change, and on \swem{} more than halves the accuracy an agent
-loses when it is moved to a harness it has never seen. Aligning hidden
+architectural change: at an equal number of training steps it is no worse than
+a single-harness control on that control's harness, and ahead of it under every
+unseen production harness, by up to $8.7$ points. Aligning hidden
 representations across renderings of the same decision point, which
 Proposition~1 makes well posed, is the natural next step.
 
@@ -910,8 +976,9 @@ production harnesses and \cham{} (one fixed synthetic configuration) on the
 $500$ Verified and $300$ Multilingual tasks (Qwen3.5-27B on a $100+60$
 subset), $17{,}374$ completed episodes over $26$ model--harness cells;
 Figure~\ref{fig:ana-mix} marks the cells that could not be run. The second is
-the E1 pair of Section~\ref{sec:exp}, \method{} and its \control{}, on
-\claudecode{} (the source harness), \opencode{} and \openhands{}: $4{,}280$
+the \method{} and control pair of the earlier Qwen3-30B-A3B-Instruct-2507 run
+(Appendix~\ref{app:e1-30b}), on \claudecode{} (the source harness),
+\opencode{} and \openhands{}: $4{,}280$
 episodes. Every call is mapped to the protocol vocabulary with the parsers of
 Section~\ref{sec:protocol}, and shell commands are further labelled by intent
 (read, search, edit, run tests, other), so that a \texttt{sed -n} issued in
@@ -1107,18 +1174,19 @@ learns to avoid in one harness and then runs into in the next.
 \includegraphics[width=\textwidth]{pic/ana_hint_behaviour.pdf}
 \end{center}
 \caption{Interface behaviour of \method{} and the \control{} on the source
-harness and on two unseen ones (E1 trajectories). (a)~Calls the harness
+harness and on two unseen ones (trajectories of the earlier run,
+Appendix~\ref{app:e1-30b}). (a)~Calls the harness
 refused, per $100$ calls, split into malformed arguments and calls to a tool
 that does not exist. (b)~Jensen--Shannon divergence between a model's semantic
 action mix on an unseen harness and its own mix on the source harness.
 (c)~How episodes end on \openhands{}, whose convention is an explicit finish
 call; both arms hit the wall clock often, which is why no \openhands{} accuracy
-enters a conclusion (Section~\ref{sec:limits}), but among the episodes that do
+enters a conclusion (Appendix~\ref{app:e1-30b}), but among the episodes that do
 not, \method{} follows the convention and the control does not.}
 \label{fig:ana-hint}
 \end{figure}
 
-Section~\ref{sec:exp} compares \method{} and its \control{} by accuracy. Their
+Appendix~\ref{app:e1-30b} compares that run's two models by accuracy. Their
 trajectories show what the accuracy is made of. On the source harness the two
 arms are alike: $1.1$ and $2.0$ rejected calls per $100$
 (Figure~\ref{fig:ana-hint}a), the same action mix, the same edit precision
@@ -1142,7 +1210,7 @@ or running into the step limit, that is, carrying the source harness's
 convention into a harness that does not have it. Even on the source harness,
 the control runs into the four-hour wall clock in $53\%$ of episodes against
 $36\%$ for \method{}. These are the behaviours the accuracy in
-Table~\ref{tab:e1} averages over, and they are what interface invariance
+Table~\ref{tab:e1-30b} averages over, and they are what interface invariance
 means at the level of a single call.
 
 \begin{figure}[t]
@@ -1192,7 +1260,7 @@ only structured calls, so the episode ends. $47$ of Qwen3.5-27B's $81$ failed
 Figure~\ref{fig:ana-examples} shows three of these failures verbatim. The
 first two are the control's: it calls \openhands{}'s file editor with the
 argument schema of \claudecode{}'s \texttt{Bash} tool, and it calls tools that
-exist nowhere. The third is not from the E1 arms but from an instruction-tuned
+exist nowhere. The third is not from a fine-tuned model but from an instruction-tuned
 model in the models $\times$ harnesses evaluation, and it is the purest form
 of interface reliance we observed: after one correct structured call, the
 model emits, as text, a call template it learned somewhere else, with a tool
@@ -1203,5 +1271,56 @@ them; the memorized surface wins anyway. $47$ of the model's $81$ failed
 the failure that \method{} is designed to remove, and the reason the
 anonymized tier of Section~\ref{sec:method} exists: a model that has learned
 to read the tool documentation in front of it has nothing to fall back on.
+
+\section{An earlier run on Qwen3-30B-A3B-Instruct-2507}
+\label{app:e1-30b}
+
+Before the experiment of Section~\ref{sec:exp} we ran the same comparison at a
+smaller scale on Qwen3-30B-A3B-Instruct-2507 \citep{qwen3}, with a different
+recipe on both sides. The data were $5{,}000$ \claudecode{} trajectories, of
+which $4{,}133$ survived the filters of Section~\ref{sec:exp}; \chr{} rendered
+each into $M=2$ surfaces, giving $8{,}266$ samples under $8{,}204$ distinct
+surface configurations with $11{,}205$ distinct tool names. \method{} trained on
+the real trajectories \emph{mixed with} their renderings and the control on the
+real trajectories alone, each for $215$ optimizer steps at a global batch of
+$32$ and learning rate $5\times10^{-5}$; for the control this is about $6.2$
+passes over its data. Matching sample counts instead would have given the
+control $27\%$ more tokens, since the rendered samples are $34\%$ shorter than
+the originals. Each cell was evaluated once, through a different serving
+endpoint from Section~\ref{sec:exp}, while the sandbox still had network
+access, and without the leak audit of Section~\ref{sec:exp}.
+
+\begin{table}[t]
+\caption{The earlier run: pass@1 (\%), one evaluation per cell. Base is the
+model before fine-tuning, under the same harness.}
+\label{tab:e1-30b}
+\begin{center}
+\begin{small}
+\begin{tabular}{llrrrr}
+\toprule
+Harness & Benchmark & Base & Control & \method{} & $\Delta$ \\
+\midrule
+\claudecode{} (source) & Verified     & $25.2$ & $47.8$ & $48.2$ & $+0.4$ \\
+\claudecode{} (source) & Multilingual & $14.7$ & $33.7$ & $35.7$ & $+2.0$ \\
+\opencode{} (unseen)   & Verified     & $16.0$ & $43.0$ & $42.0$ & $-1.0$ \\
+\opencode{} (unseen)   & Multilingual & $13.3$ & $23.3$ & $\mathbf{31.0}$ & $\mathbf{+7.7}$ \\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{center}
+\end{table}
+
+Table~\ref{tab:e1-30b} gives the result. The one difference beyond the noise
+floor is the unseen-harness, unseen-language cell, where \method{} gains $7.7$
+points ($93/300$ against $70/300$; two-proportion $z\approx2.11$,
+$p\approx0.035$). Measured as the accuracy each model loses when moved from
+\claudecode{} to \opencode{}, \method{} loses $4.7$ points on Multilingual
+against the control's $10.4$, but $6.2$ on Verified against the control's
+$4.8$: on Verified this run shows no benefit. \openhands{} was also run and is
+not reported. Both models timed out at high rates ($25\%$ and $64\%$ of settled
+trials), traced to a proactive-compaction threshold set above the context
+length actually reached, so that per-step prefill grew until the wall clock ran
+out. Appendix~\ref{app:analysis} uses this run's trajectories, \openhands{}
+included, only for statistics that do not depend on accuracy.
 
 \end{document}
