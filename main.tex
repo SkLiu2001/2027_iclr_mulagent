@@ -626,6 +626,58 @@ is nonetheless in distribution: \method{}'s training data was anonymized with
 the same identifier generator, so the result shows that this behaviour was
 acquired, not that it extends to naming schemes unseen in training.
 
+\subsection{Moving one surface axis at a time}
+\label{sec:axes}
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{pic/chameleon_axes.pdf}
+\end{center}
+\caption{\cham{} surfaces that move surface axes, one or several at a time,
+away from a \claudecode{}-like origin (\swem{}, one evaluation per surface).
+\textbf{(a)}~The axes each surface changes (A1 naming and granularity, A3 prompt
+and documentation, A4 observation format, A5 turn conventions) and the accuracy
+of \method{} and of the control; $\Delta$ is \method{} minus control.
+\textbf{(b)}~Mean accuracy over the surfaces that change $d$ axes; open markers
+are the four single-axis surfaces.}
+\label{fig:axes}
+\end{figure}
+
+Production harnesses differ on all surface axes at once, so neither
+Section~\ref{sec:step-matched} nor Section~\ref{sec:anon} can say which axis a
+model is bound to; \cham{} can move them one at a time. We start from an origin
+configuration that mimics \claudecode{}, with its split tools and their names
+and parameters, an engineering system prompt with formal tool documentation,
+numbered file views and \claudecode{}'s turn conventions, and move each axis in
+turn to its farthest setting. A1 merges the tools into a single monolithic tool
+with anonymized tool and parameter names; A3 changes the persona of the system
+prompt and renders the tool documentation as tables; A4 drops line numbers,
+wraps observations in a fence, truncates them at $2{,}000$ characters and
+changes the markers for empty and failed output; A5 removes the runtime
+reminder, adds a turn header, returns observations as user turns and ends an
+episode with a finish call. Two further surfaces change A1 and A5 together and
+all four axes. The call syntax (A2) is fixed by native function calling, and
+every surface exposes the same actions. We evaluate the \method{} model of
+Appendix~\ref{app:e1-30b} and a control trained on the same \claudecode{}
+trajectories alone, once per surface on \swem{}; these runs are not
+leak-audited, and the few episodes still running when a cell was closed (at
+most $15$ of $300$) are excluded, so only differences between surfaces are
+interpreted. The control is bound to A1 (Figure~\ref{fig:axes}a): changing
+naming and granularity alone takes it from $15.1\%$ on the origin to $3.3\%$,
+and it stays at that level whenever A1 is changed ($3.8\%$ with A1 and A5,
+$3.4\%$ with all four axes), whereas changing A3, A4 or A5 alone leaves it
+between $12.2\%$ and $15.8\%$. \method{} is not: with A1 changed alone it scores
+$28.3\%$ against $24.0\%$ on the origin, and with A1 and A5 changed together
+$33.7\%$; only the surface that changes all four axes brings it down, to
+$17.0\%$. \method{} is ahead of the control on every surface, by $8.9$ points on
+the origin and by $29.9$ points when A1 and A5 are changed together, and
+averaged over the surfaces at each distance from the origin its accuracy is
+$24.0\%$, $26.4\%$, $33.7\%$ and $17.0\%$ for $d=0$, $1$, $2$ and $4$, against
+$15.1\%$, $11.0\%$, $3.8\%$ and $3.4\%$ for the control
+(Figure~\ref{fig:axes}b). A model trained on one harness has thus absorbed that
+harness's tool vocabulary and granularity as part of the task, which \method{}
+has not; what remains for \method{} is a loss when every axis changes at once.
+
 \section{Limitations}
 \label{sec:limits}
 
