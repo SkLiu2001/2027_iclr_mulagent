@@ -585,15 +585,46 @@ have an explanation for it. An earlier run of the same comparison on a weaker
 base model with a different recipe is reported in Appendix~\ref{app:e1-30b};
 there \method{}'s advantage appeared on Multilingual only.
 
-\subsection{Planned ablations}
+\subsection{Anonymizing the interface at test time}
+\label{sec:anon}
 
-The step-matched control rules out ``more gradient steps''. It does not
-separate the contribution of surface \emph{diversity} from that of merely
-\emph{changing} the surface once. The decisive ablation renders the same
-$8{,}677$ trajectories into the same number of samples at the same token count
-but draws a \emph{single} fixed configuration instead of $\numsurfaces{}$; a sweep over
-the number of distinct surfaces then yields an accuracy-versus-diversity curve.
-\todo{running; results to be added}
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{pic/anon_names.pdf}
+\end{center}
+\caption{Anonymizing tool and parameter names under \cham{} on \swem{}, one
+evaluation per setting. \textbf{(a)}~Pass@1 as more names are replaced.
+\textbf{(b)}~Tasks whose outcome flips when all names are replaced.}
+\label{fig:anon}
+\end{figure}
+
+Whole harnesses differ from the training surfaces in many respects at once, so
+they cannot show which cue a model relies on. We isolate the cheapest cue, a
+tool's name, which lets a model that recognizes \texttt{Bash} act without
+reading its description and which \chr{}'s anonymized tier is meant to make
+unnecessary. Holding the
+\cham{} configuration of Table~\ref{tab:e0} fixed (nine tools with seventeen
+parameters), we replace about half of the tool and parameter names (four and
+eight, respectively), and then all of them, with meaningless identifiers, so
+that, for example, \texttt{run\_command} becomes \texttt{zete}. The tool
+descriptions are identical across settings and the system prompt names no
+tool, so what each tool does remains readable throughout. Each model is
+evaluated once per setting on \swem{} and compared only with its own run under
+the original names; because these runs are separate from those of
+Tables~\ref{tab:e0} and~\ref{tab:e1} and not leak-audited, only differences
+between settings are interpreted. As Figure~\ref{fig:anon} shows, \method{}'s
+accuracy is unchanged ($74.3\%$, $74.6\%$ and $74.3\%$), and with all names
+replaced it newly fails exactly as many tasks as it newly solves ($22$ each).
+The base model falls from $68.0\%$ to $67.3\%$ and $64.0\%$, losing $29$ tasks
+and gaining $17$, and its additional failures stem from the new names
+themselves: calls to tools that do not exist rise from $5$ to $27$ of the $300$
+tasks, and they misspell the new identifiers (\texttt{kazu\_op} for
+\texttt{kozu\_op}) rather than revert to the original ones. On this interface,
+then, \method{} acts on the tool descriptions rather than on recognizable
+names, which is the behaviour the anonymized tier is meant to teach. The test
+is nonetheless in distribution: \method{}'s training data was anonymized with
+the same identifier generator, so the result shows that this behaviour was
+acquired, not that it extends to naming schemes unseen in training.
 
 \section{Limitations}
 \label{sec:limits}
@@ -619,6 +650,10 @@ base model; an earlier run on Qwen3-30B-A3B-Instruct-2507
 trajectories come from one source harness. Whether the effect scales with model
 size, or holds when the source harness is \codexcli{}'s shell-only surface,
 remains open.
+
+\paragraph{Diversity versus a single re-skin.} We have not separated sampling
+many surfaces from changing the surface once; that needs a control trained on
+one fixed rendering of the same trajectories.
 
 \paragraph{Rendering into shell-only surfaces is not yet supported.} Our
 renderer implements three granularities (split, unified editor, monolithic).
