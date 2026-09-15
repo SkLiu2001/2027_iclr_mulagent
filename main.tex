@@ -129,7 +129,7 @@ The effect is measurable: fine-tuning Qwen3.6-35B-A3B on \claudecode{}
 trajectories raises its \claudecode{} accuracy on \swev{} from $69.0\%$ to
 $78.4\%$ but leaves its \codexcli{} accuracy where it was ($68.0\%$ before,
 $66.7\%$ after), widening its spread across harnesses from $3.4$ to $11.7$
-points (Section~\ref{sec:exp}).
+points (Section~\ref{sec:step-matched}).
 
 \begin{figure}[t]
 \begin{center}
@@ -192,7 +192,7 @@ marginalize over. Our contributions are summarized as follows:
   $9.0$ points for a fixed model and task set; the harness that does worst
   is not the one with the fewest tools, the size of the spread is a
   property of the model, and fine-tuning on one harness widens it
-  (Section~\ref{sec:exp}).
+  (Sections~\ref{sec:harness-choice} and~\ref{sec:step-matched}).
 \item \textbf{The \HP{}, with an exactness guarantee that is measured rather
   than assumed.} A $12$-action vocabulary covers $99.96\%$ of \numactions{} real
   calls from four harnesses; surface rendering is exactly invertible on
@@ -204,7 +204,7 @@ marginalize over. Our contributions are summarized as follows:
   same trajectories in their original harness for the same number of steps,
   \method{} is ahead under all three unseen production harnesses on both
   benchmarks and narrows the \swem{} range across five harnesses from $7.4$ to
-  $1.6$ points (Section~\ref{sec:exp}).
+  $1.6$ points (Section~\ref{sec:step-matched}).
 \end{itemize}
 
 \section{The Harness Protocol}
@@ -447,29 +447,22 @@ the control sees each trajectory three times in its original surface, and
 \method{} sees it in three different surfaces, none of which is
 \claudecode{}'s own.
 
-\paragraph{Evaluation.} We report \swev{} ($500$ tasks) and \swem{} ($300$
-tasks) under the four production harnesses of Table~\ref{tab:harnesses} and
-under \cham{} with one fixed configuration, with all models served by vLLM on
-one serving stack. For the models of E1, \claudecode{} is the source harness;
-\opencode{}, \openhands{} and \codexcli{} are unseen as harnesses, though not
-all as vocabularies: \chr{}'s name pool excludes \openhands{}'s tool names,
-while \opencode{}'s occur, recombined with others, in $33\%$ of rendered
-samples and \codexcli{}'s in $21\%$ (Section~\ref{sec:limits}). \cham{}'s
-configuration is drawn from the space \chr{} samples from: it is new to both
-models, but of a kind \method{} was trained on. E0 additionally runs three
-open-weight models, Qwen3.5-35B-A3B, Qwen3.6-35B-A3B and KAT-Coder-V2.5-Dev.
-Each E1 cell is the mean of three evaluations; E0 cells are single evaluations.
-The task images retain the repository's later git history, and an agent can
-download the upstream patch when the sandbox has network access; in E0, an
-episode in which the agent obtained the reference fix in either way is scored
-as a failure whatever the verifier says (at most $3.2$ points of a Verified
-cell and $9.3$ points of a Multilingual cell). \todo{apply the same audit to
-the E1 cells} Repeated submissions of an identical configuration give a
-single-evaluation noise floor of $\pm2.0$ points on the $500$-task set and
-$\pm1.0$ points on the $300$-task set; differences below these are not
-interpreted.
+\paragraph{Evaluation.} We evaluate on two benchmarks and report pass@1.
+\swev{} is a human-validated subset of SWE-bench \citep{jimenez2024swebench}:
+$500$ tasks from $12$ Python repositories. \swem{} \citep{yang2025swesmith}
+has $300$ tasks in nine other programming languages (C, C++, Go, Java,
+JavaScript, TypeScript, PHP, Ruby and Rust). Every model runs under the four
+production harnesses of Table~\ref{tab:harnesses} and under \cham{} with one
+fixed configuration, and all models are served with vLLM on the same serving
+stack. Section~\ref{sec:harness-choice} evaluates three open-weight models,
+Qwen3.5-35B-A3B, Qwen3.6-35B-A3B and KAT-Coder-V2.5-Dev, once per cell;
+Section~\ref{sec:step-matched} evaluates the two fine-tuned models
+and averages three evaluations per cell. Appendix~\ref{app:eval} describes how
+episodes that obtained the reference fix are scored and gives the run-to-run
+noise floor.
 
-\subsection{E0: harness choice alone moves accuracy}
+\subsection{Harness choice alone moves accuracy}
+\label{sec:harness-choice}
 
 \begin{table}[t]
 \caption{Harness choice alone moves accuracy. Pass@1 (\%) of three open-weight
@@ -511,7 +504,8 @@ $7.0$, $3.0$). KAT-Coder-V2.5-Dev, a model post-trained for agentic coding, is
 close to interface-invariant already; \method{} aims to obtain the same property
 from the training data alone.
 
-\subsection{E1: \method{} versus a step-matched control}
+\subsection{\method{} versus a step-matched control}
+\label{sec:step-matched}
 
 \begin{table}[t]
 \caption{\method{} versus the \control{}, both fine-tuned from \basemodel{}:
@@ -579,7 +573,7 @@ renders. The advantage is therefore largest where the control is weakest:
 \method{}'s worst harness is $8.7$ points (Verified) and $7.4$ points
 (Multilingual) above the control's, and on Multilingual its five accuracies lie
 within $1.6$ points ($73.4$--$75.0\%$), a tighter range than the base model's
-own $7.0$. Against the single-evaluation noise floor, \method{} is ahead in
+own $7.0$. Against the single-evaluation noise floor (Appendix~\ref{app:eval}), \method{} is ahead in
 seven of the ten cells, level in two (\claudecode{} on Verified, \cham{} on
 Multilingual), and behind in one.
 
@@ -604,11 +598,11 @@ the number of distinct surfaces then yields an accuracy-versus-diversity curve.
 \section{Limitations}
 \label{sec:limits}
 
-\paragraph{Strength of evidence.} Each E1 cell averages three evaluations, but
+\paragraph{Strength of evidence.} Each cell of Table~\ref{tab:e1} averages three evaluations, but
 we compare the two models against a noise floor rather than with per-task
 paired tests, and each model is a single training run. One of the ten cells
 favours the control beyond the noise floor. \todo{paired per-task tests; leak
-audit of the E1 cells}
+audit of Table~\ref{tab:e1}}
 
 \paragraph{Unseen harnesses are not all unseen vocabularies.} \chr{}'s first
 naming tier harvests real tool names from the parsed harnesses and recombines
@@ -1131,7 +1125,7 @@ rest. Consequently an oracle that may pick the harness per task beats the best
 single harness by $2.1$ (GPT-5.6) to $11.9$ (Qwen3.6-35B-A3B) points
 (Figure~\ref{fig:ana-agree}c), and the gap widens as the model weakens. Part of
 this gap is the run-to-run variance a single harness would also show
-($\pm2.0$ points, Section~\ref{sec:exp}); the remainder is what the interface,
+($\pm2.0$ points, Appendix~\ref{app:eval}); the remainder is what the interface,
 not the task, decided. Two readings follow. The spread of a headline table
 understates interface dependence, since accuracies can agree while the solved
 sets do not; and the oracle gap bounds what a policy that is indifferent to
@@ -1278,7 +1272,7 @@ to read the tool documentation in front of it has nothing to fall back on.
 \section{An earlier run on Qwen3-30B-A3B-Instruct-2507}
 \label{app:e1-30b}
 
-Before the experiment of Section~\ref{sec:exp} we ran the same comparison at a
+Before the experiment of Section~\ref{sec:step-matched} we ran the same comparison at a
 smaller scale on Qwen3-30B-A3B-Instruct-2507 \citep{qwen3}, with a different
 recipe on both sides. The data were $5{,}000$ \claudecode{} trajectories, of
 which $4{,}133$ survived the filters of Section~\ref{sec:exp}; \chr{} rendered
@@ -1291,7 +1285,7 @@ passes over its data. Matching sample counts instead would have given the
 control $27\%$ more tokens, since the rendered samples are $34\%$ shorter than
 the originals. Each cell was evaluated once, through a different serving
 endpoint from Section~\ref{sec:exp}, while the sandbox still had network
-access, and without the leak audit of Section~\ref{sec:exp}.
+access, and without the leak audit of Appendix~\ref{app:eval}.
 
 \begin{table}[t]
 \caption{The earlier run: pass@1 (\%), one evaluation per cell. Base is the
@@ -1326,5 +1320,20 @@ trials), traced to a proactive-compaction threshold set above the context
 length actually reached, so that per-step prefill grew until the wall clock ran
 out. Appendix~\ref{app:analysis} uses this run's trajectories, \openhands{}
 included, only for statistics that do not depend on accuracy.
+
+\section{Evaluation details}
+\label{app:eval}
+
+\paragraph{Leaked reference fixes.} The task images retain the repository's
+later git history, and an agent can download the upstream patch when the sandbox
+has network access. An episode whose tool observations show that the agent
+obtained the reference fix in either way is scored as a failure whatever the
+verifier says. In Table~\ref{tab:e0} this changes a cell by at most $3.2$ points on Verified and
+$9.3$ points on Multilingual. \todo{apply the same audit to Table~\ref{tab:e1}}
+
+\paragraph{Noise floor.} Repeated submissions of an identical configuration
+give a single-evaluation noise floor of $\pm2.0$ points on the $500$-task set
+and $\pm1.0$ points on the $300$-task set; differences below these are not
+interpreted.
 
 \end{document}
