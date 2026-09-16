@@ -8,6 +8,7 @@
 \usepackage{hyperref}
 \usepackage{url}
 \usepackage{booktabs}
+\usepackage{array}
 \usepackage{siunitx}
 \sisetup{detect-weight=true, retain-explicit-plus=true}
 \usepackage{graphicx}
@@ -310,7 +311,9 @@ Action & Share & Action & Share \\
 \caption{Four production harnesses agree on semantics and disagree on
 everything else. ``Tools'' counts the standard declared schema; granularity is
 the $A_1$ setting each harness occupies, where shell only means that files are
-read, searched and edited through shell commands rather than first-class tools.}
+read, searched and edited through shell commands rather than first-class tools.
+Tool names are those of the releases in our parsed corpora; the releases
+evaluated in Section~\ref{sec:exp} rename a few of them (Appendix~\ref{app:eval}).}
 \label{tab:harnesses}
 \begin{center}
 \begin{small}
@@ -386,8 +389,10 @@ under real harnesses that were never seen in training.}
 \label{fig:pipeline}
 \end{figure}
 
-\method{} has two components, both of which touch only the data; nothing about
-the model architecture or the training objective changes.
+\method{} has two components, Counterfactual Harness Rendering and interface
+anonymization, the second implemented as one tier of the first's name sampler;
+both touch only the data, and nothing about the model architecture or the
+training objective changes.
 Figure~\ref{fig:pipeline} traces the pipeline end to end.
 
 \subsection{L1: Counterfactual Harness Rendering}
@@ -422,11 +427,13 @@ Table~\ref{tab:roundtrip} serve the round-trip measurement, not training.
 
 Sampling from real vocabularies alone leaves a shortcut intact: each semantic
 function has only a handful of attested names, so a model can still map
-\texttt{Bash}, \texttt{bash}, \texttt{terminal} and \texttt{exec\_command} onto ``the shell tool'' by memorization. We therefore
+\texttt{Bash}, \texttt{bash} and \texttt{exec\_command} onto ``the shell tool''
+by memorization. We therefore
 draw tool names from three tiers: names harvested verbatim from real harnesses
 but \emph{recombined across} them ($\approx43\%$ of samples), plausible names
-that no parsed harness uses ($\approx27\%$), and meaningless pronounceable
-identifiers ($30\%$). Canonical semantics are never anonymized: they remain in the tool
+that no parsed harness uses ($\approx27\%$), and meaningless pronounceable identifiers ($30\%$). The third tier is the
+anonymization component: a sample drawn into it has every tool name replaced.
+Canonical semantics are never anonymized: they remain in the tool
 documentation, so under the third tier the documentation is the only channel
 carrying the information needed to act.
 
@@ -445,11 +452,13 @@ arbitrary synthetic harnesses.
 \label{sec:exp}
 
 \subsection{Setup}
-
+\label{sec:setup}
 \paragraph{Model and data.} We fine-tune \basemodel{}
 \citep{qwen3} on $9{,}366$ \claudecode{} trajectories over SWE tasks, one per
-task instance. After dropping trajectories containing unmapped tools or fewer
-than three semantic actions, $8{,}677$ remain; \chr{} renders each into $M=3$
+task instance. Normalization moves every call out of the text channels, and we
+check that no call text remains in the reasoning or observations of any kept
+trajectory. After dropping trajectories containing unmapped tools or fewer than
+three semantic actions, $8{,}677$ remain; \chr{} renders each into $M=3$
 counterfactual surfaces, yielding $\numsurfaces{}$ samples, each under its own
 surface configuration, with $21{,}476$ distinct tool names; $30\%$ of samples
 are anonymized. The samples vary $A_1$, $A_3$, $A_4$ and $A_5$ ($10{,}335$
@@ -474,15 +483,18 @@ the control sees each trajectory three times in its original surface, and
 \swev{} is a human-validated subset of SWE-bench \citep{jimenez2024swebench}:
 $500$ tasks from $12$ Python repositories. \swem{} \citep{yang2025swesmith}
 has $300$ tasks in nine other programming languages (C, C++, Go, Java,
-JavaScript, TypeScript, PHP, Ruby and Rust). Every model runs under the four
-production harnesses of Table~\ref{tab:harnesses} and under \cham{} with one
-fixed configuration, and all models are served with vLLM on the same serving
-stack. Section~\ref{sec:harness-choice} evaluates three open-weight models,
-Qwen3.5-35B-A3B, Qwen3.6-35B-A3B and KAT-Coder-V2.5-Dev, once per cell;
-Section~\ref{sec:step-matched} evaluates the two fine-tuned models
-and averages three evaluations per cell. Appendix~\ref{app:eval} describes how
-episodes that obtained the reference fix are scored and gives the run-to-run
-noise floor.
+JavaScript, TypeScript, PHP, Ruby and Rust). In
+Sections~\ref{sec:harness-choice} and~\ref{sec:step-matched}, every model
+runs under the four production harnesses of Table~\ref{tab:harnesses} and
+under \cham{} with one fixed configuration, and all models are served with
+vLLM on the same serving stack; Section~\ref{sec:harness-choice} evaluates
+three open-weight models, Qwen3.5-35B-A3B, Qwen3.6-35B-A3B and
+KAT-Coder-V2.5-Dev, once per cell, and Section~\ref{sec:step-matched}
+evaluates the two fine-tuned models and averages three evaluations per cell.
+The later experiments state their own conditions. Appendix~\ref{app:eval}
+describes how episodes that obtained the reference fix are scored, gives the
+run-to-run noise floor, and summarizes the settings of every experiment in
+Table~\ref{tab:settings}.
 
 \subsection{Harness choice alone moves accuracy}
 \label{sec:harness-choice}
@@ -517,7 +529,7 @@ Spread        & 9.0  & 8.7  & 3.4  & 7.0  & 2.6  & 3.0  \\
 
 Table~\ref{tab:e0} establishes the phenomenon the method addresses. The ordering
 is not explained by tool count or interface simplicity: \codexcli{}, which
-declares thirteen tools but routes every action through a shell, is the lowest
+declares thirteen tools but routes file operations through a shell, is the lowest
 of the four production harnesses on Verified for all three open-weight models,
 while \openhands{}, with four tools, is the best or second best harness for the
 two Qwen models. The size of the spread is a property of the model: $9.0$
@@ -704,9 +716,10 @@ are the four single-axis surfaces.}
 \label{fig:axes}
 \end{figure}
 
-Production harnesses differ on several surface axes at once, so neither
-Section~\ref{sec:step-matched} nor Section~\ref{sec:anon} can say which axis a
-model is bound to; \cham{} can move them one at a time. We start from an origin
+Production harnesses differ on several surface axes at once, so
+Section~\ref{sec:step-matched} cannot say which axis a model is bound to, and
+Section~\ref{sec:anon} isolates only one cue; \cham{} can move the axes one at
+a time. We start from an origin
 configuration that mimics \claudecode{}, with its split tools and their names
 and parameters, an engineering system prompt with formal tool documentation,
 numbered file views and \claudecode{}'s turn conventions, and move each axis in
@@ -761,9 +774,8 @@ harness's names in turn would make the others so.
 
 \paragraph{One model family, one source harness.} The main results use one
 base model; an earlier run on Qwen3-30B-A3B-Instruct-2507
-(Appendix~\ref{app:e1-30b}) agrees on Multilingual but not on Verified. All
-trajectories come from one source harness. Whether the effect scales with model
-size, or holds when the source harness is \codexcli{}'s shell-only surface,
+(Appendix~\ref{app:e1-30b}) agrees on Multilingual but not on Verified. All \method{} runs use \claudecode{} as the source harness. Whether the effect
+scales with model size, or holds when the source harness is \codexcli{}'s shell-only surface,
 remains open.
 
 \paragraph{Diversity versus a single re-skin.} We have not separated sampling
@@ -807,7 +819,7 @@ of \citet{allen2019analogies}.
 
 Agent harnesses differ far more on the surface than in substance: four
 production harnesses, ranging from four tools to twenty-one and from
-first-class file editors to nothing but a shell, reduce to twelve semantic
+first-class file editors to file access through a shell alone, reduce to twelve semantic
 actions covering $99.96\%$ of $\numactions{}$ real calls. Making that core explicit
 as the \HP{}, and verifying that the surface map is invertible on those calls,
 exactly in $95.2\%$ of \numroundtrip{} render--parse checks and up to an
@@ -1039,7 +1051,7 @@ trajectory-level statement follows step by step: an assistant turn is the
 reasoning text followed by the call blocks of that step, separated by blank
 lines, and the decoder returns the text outside the blocks as the reasoning.
 This is exact as long as the reasoning contains no block opener of the family,
-which the normalization of Section~\ref{sec:protocol} guarantees by moving
+which the normalization of Section~\ref{sec:setup} guarantees by moving
 every call out of the text channels. Two turn conventions absorb the final
 reasoning into the submission message (the shell family, and the plain-reply
 completion convention of $A_5$); we count them under $\simeq$. $\square$
@@ -1127,7 +1139,8 @@ harnesses evaluation: six instruction-tuned models (Claude Opus 5, GPT-5.6,
 DeepSeek-V4-Pro, GLM-5.2, Qwen3.6-35B-A3B, Qwen3.5-27B) run under the four
 production harnesses and \cham{} (one fixed synthetic configuration) on the
 $500$ Verified and $300$ Multilingual tasks (Qwen3.5-27B on a $100+60$
-subset), $17{,}374$ completed episodes over $26$ model--harness cells;
+subset), $17{,}374$ completed episodes over $26$ model--harness cells, of which
+$17{,}230$ made at least one tool call and enter Table~\ref{tab:ana-summary};
 Figure~\ref{fig:ana-mix} marks the cells that could not be run. The second is
 the \method{} and control pair of the earlier Qwen3-30B-A3B-Instruct-2507 run
 (Appendix~\ref{app:e1-30b}), on \claudecode{} (the source harness),
@@ -1167,8 +1180,8 @@ fixed harness shifts it by $0.027$ bits. The harness, in other words, changes
 what a model does about as little as the choice of model does, and both
 changes are small. What does move is exactly what the harness makes explicit:
 planning calls exist only where a harness declares a task tracker
-(\texttt{TodoWrite} in \claudecode{} and \opencode{}, \texttt{task\_tracker}
-in \openhands{}), and a terminating call only where the harness requires one
+(\texttt{TodoWrite} in \claudecode{}, \texttt{todowrite} in \opencode{},
+\texttt{task\_tracker} in \openhands{}), and a terminating call only where the harness requires one
 (\openhands{}, \cham{}). \codexcli{} is the one surface that visibly reshapes
 behaviour: with no first-class search tool, GPT-5.6 spends $38\%$ of its calls
 searching there against $13$--$25\%$ elsewhere, the exploration that a single
@@ -1399,8 +1412,9 @@ means at the level of a single call.
 \end{footnotesize}
 \caption{Three interface failures, verbatim. (1)~The control applies the
 argument schema of its source harness's shell tool (\texttt{command} plus
-\texttt{description}) to a different harness's file editor. (2)~It names a
-tool that exists nowhere. (3)~An instruction-tuned model, after one correct
+\texttt{description}) to a different harness's file editor
+(\texttt{str\_replace\_editor}, the editor of the \openhands{} build used in
+that run; Appendix~\ref{app:eval}). (2)~It names a tool that exists nowhere. (3)~An instruction-tuned model, after one correct
 structured call, falls back to a call template it memorized, naming
 \texttt{exec\_command}, the shell entry point of the \codexcli{} release in
 our parsed corpus (Table~\ref{tab:harnesses}), inside its own text markup;
@@ -1431,8 +1445,7 @@ to read the tool documentation in front of it has nothing to fall back on.
 Before the experiment of Section~\ref{sec:step-matched} we ran the same comparison at a
 smaller scale on Qwen3-30B-A3B-Instruct-2507 \citep{qwen3}, with a different
 recipe on both sides. The data were $5{,}000$ \claudecode{} trajectories;
-\chr{} rendered the $4{,}133$ of them that passed the filters of
-Section~\ref{sec:exp} into $M=2$ surfaces each, giving $8{,}266$ samples under
+\chr{} rendered the $4{,}133$ of them that passed the filters of Section~\ref{sec:setup} into $M=2$ surfaces each, giving $8{,}266$ samples under
 $8{,}204$ distinct surface configurations with $11{,}205$ distinct tool names.
 \method{} trained on all $5{,}000$ real trajectories \emph{mixed with} the
 $8{,}266$ renderings ($13{,}266$ samples) and the control on the real
@@ -1441,7 +1454,7 @@ batch of $32$ and learning rate $5\times10^{-5}$; for the control this is about 
 passes over its data. Matching sample counts instead would have given the
 control $27\%$ more tokens, since the rendered samples are $34\%$ shorter than
 the originals. Each cell was evaluated once, through a different serving
-endpoint from Section~\ref{sec:exp}, while the sandbox still had network
+endpoint from Section~\ref{sec:setup}, while the sandbox still had network
 access, and without the leak audit of Appendix~\ref{app:eval}.
 
 \begin{table}[t]
@@ -1498,5 +1511,45 @@ can differ from the difference of two displayed values by $0.1$.
 give a single-evaluation noise floor of $\pm2.0$ points on the $500$-task set
 and $\pm1.0$ points on the $300$-task set; differences below these are not
 interpreted.
+
+\paragraph{Harness releases.} The releases evaluated here differ from those of
+the parsed corpora (Table~\ref{tab:harnesses}) in a few tool names:
+\codexcli{} exposes its shell as \texttt{shell} rather than
+\texttt{exec\_command}, and the \openhands{} build used for the earlier run
+(Appendix~\ref{app:e1-30b}) exposes \texttt{execute\_bash} and
+\texttt{str\_replace\_editor} in place of \texttt{terminal} and
+\texttt{file\_editor} and has no task tracker. Figure~\ref{fig:ana-examples}
+quotes the evaluated names verbatim.
+
+\paragraph{Settings of every experiment.} Table~\ref{tab:settings} lists, for
+each experiment, the models compared, the harnesses and benchmarks, the number
+of evaluations per cell, and whether the runs share the serving stack of
+Section~\ref{sec:setup} and the leaked-fix scoring above.
+
+\begin{table}[ht]
+\caption{Settings of every experiment. ``Section~\ref{sec:setup} stack'' is the
+vLLM serving stack of Section~\ref{sec:setup}; ``Appendix~\ref{app:e1-30b}
+conditions'' is the earlier serving endpoint, with network access in the
+sandbox. ``Audited'' refers to the leaked-fix scoring above.}
+\label{tab:settings}
+\begin{center}
+\begin{footnotesize}
+\setlength{\tabcolsep}{2.5pt}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\begin{tabular}{@{}L{0.68in}L{0.9in}L{1.05in}L{0.85in}L{0.36in}L{0.27in}L{0.94in}@{}}
+\toprule
+Where & Base model & Models compared & Harnesses & Bench. & Evals & Conditions \\
+\midrule
+Section~\ref{sec:harness-choice}, Table~\ref{tab:e0} & Qwen3.5-35B-A3B, \basemodel{}, KAT-Coder-V2.5-Dev & not fine-tuned & four production, \cham{} & V, M & 1 & Section~\ref{sec:setup} stack; audited \\
+Section~\ref{sec:step-matched}, Table~\ref{tab:e1} & \basemodel{} & \method{}, \control{} & four production, \cham{} & V, M & 3 & Section~\ref{sec:setup} stack; audit pending \\
+Section~\ref{sec:real}, Figure~\ref{fig:real} & Qwen3-30B-A3B-Instruct-2507 & \method{} of Appendix~\ref{app:e1-30b}, real-trajectory model & \claudecode{}, \opencode{} & V, M & 1 & Appendix~\ref{app:e1-30b} conditions; not audited \\
+Section~\ref{sec:anon}, Figure~\ref{fig:anon} & \basemodel{} & base, \method{} of Table~\ref{tab:e1} & \cham{}, three naming settings & M & 1 & separate runs; not audited \\
+Section~\ref{sec:axes}, Figure~\ref{fig:axes} & Qwen3-30B-A3B-Instruct-2507 & \method{} of Appendix~\ref{app:e1-30b}, control & \cham{}, seven surfaces & M & 1 & separate runs; not audited; unfinished episodes excluded \\
+Appendix~\ref{app:e1-30b}, Table~\ref{tab:e1-30b} & Qwen3-30B-A3B-Instruct-2507 & \method{}, control & \claudecode{}, \opencode{} & V, M & 1 & Appendix~\ref{app:e1-30b} conditions; not audited \\
+\bottomrule
+\end{tabular}
+\end{footnotesize}
+\end{center}
+\end{table}
 
 \end{document}
