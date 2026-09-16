@@ -79,8 +79,9 @@ We find that this variation is largely superficial. Across four production
 harnesses, diverse tool interfaces reduce to a shared set of only $12$ semantic
 actions. We formalize this common action space as the \HP{} and develop
 semantics-preserving transformations between the protocol and concrete
-harness interfaces, verified with zero mismatches in \numroundtrip{} render--parse
-checks over \numactions{} real actions. Building on this representation, we introduce \method{}
+harness interfaces, verified in \numroundtrip{} render--parse checks over
+\numactions{} real actions: no mismatches, with $95.2\%$ of checks exact and the
+rest equal up to an operational equivalence. Building on this representation, we introduce \method{}
 (Harness-INvariant Training), which re-renders each training trajectory under
 counterfactual harness interfaces and anonymizes interface-specific cues,
 encouraging the model to learn action semantics rather than memorize tool
@@ -160,8 +161,10 @@ surface decomposes into five axes that can be set independently: tool
 granularity and naming, call syntax, prompt documentation, observation
 formatting, and turn conventions. The abstraction is not lossy: rendering a
 protocol trajectory into a surface and parsing it back recovers the original
-action sequence exactly, measured at \rtacc{} in \numroundtrip{} render--parse
-checks over all \numactions{} actions (Section~\ref{sec:protocol}). This is a \emph{descriptive} claim about
+action sequence, exactly for surfaces with named tools and up to an operational
+equivalence for shell-only ones, measured at \rtacc{} consistency in
+\numroundtrip{} render--parse checks over all \numactions{} actions, $95.2\%$
+of them exact (Section~\ref{sec:protocol}). This is a \emph{descriptive} claim about
 harnesses that already exist, not a proposal for a new standard.
 
 Exact invertibility is what turns the protocol from an analysis tool into a
@@ -195,9 +198,9 @@ marginalize over. Our contributions are summarized as follows:
   (Sections~\ref{sec:harness-choice} and~\ref{sec:step-matched}).
 \item \textbf{The \HP{}, with an exactness guarantee that is measured rather
   than assumed.} A $12$-action vocabulary covers $99.96\%$ of \numactions{} real
-  calls from four harnesses; surface rendering is exactly invertible on those
-  calls, verified in \numroundtrip{} render--parse checks
-  (Section~\ref{sec:protocol}).
+  calls from four harnesses; surface rendering is invertible on those calls,
+  verified in \numroundtrip{} render--parse checks with no mismatches, $95.2\%$
+  exact and $4.8\%$ operationally equivalent (Section~\ref{sec:protocol}).
 \item \textbf{\method{}}, a training method that multiplies existing
   trajectories along the surface axes, needing no new task data and no
   architecture change (Section~\ref{sec:method}).
@@ -252,8 +255,9 @@ outside the vocabulary have no protocol form and are excluded), render each
 under three or four independently sampled configurations spanning all four
 call-syntax families, and parse the result back, comparing the action verb and
 every argument: \numroundtrip{} render--parse checks in all. Agreement is
-\rtacc{} with zero mismatches; $\simeq$ cases are counted as consistent, never
-as exact. Two consequences follow. First, the composition
+\rtacc{} with zero mismatches: $1{,}776{,}443$ checks ($95.2\%$) are exact, and
+$89{,}930$ ($4.8\%$), all in the shell family, agree up to $\simeq$ and are
+never counted as exact. Two consequences follow. First, the composition
 $T_{h \to h'} = R_{h'} \circ P_h$ is a well-defined, semantics-preserving
 translation between any two harnesses, so the protocol acts as a normal form. Second, the identifiability assumption behind
 augmentation-based representation learning, namely that the augmentation
@@ -332,8 +336,11 @@ interface-invariant one should not.
 
 \begin{table}[t]
 \caption{Round-trip exactness. Every action of each corpus is rendered under
-three or four randomly sampled surface configurations (``Renderings'') and
-parsed back; a check counts as exact when the verb and all arguments match.
+randomly sampled surface configurations, four per action for the mixed set and
+three for the other two corpora, and parsed back. A check is exact when the
+verb and all arguments match, and $\simeq$ when they match up to the
+operational equivalence of Proposition~1, which arises only in the shell
+family; consistency, exact plus $\simeq$ over checks, is \rtacc{} in every row.
 The $232$ calls outside the vocabulary (Table~\ref{tab:vocab}) have no protocol
 form and are not rendered.}
 \label{tab:roundtrip}
@@ -342,13 +349,13 @@ form and are not rendered.}
 \setlength{\tabcolsep}{4.5pt}
 \begin{tabular}{lrrrrrr}
 \toprule
-Corpus & Trajectories & Actions & Renderings & Checks & Mismatches & Consistency \\
+Corpus & Trajectories & Actions & Checks & Exact & $\simeq$ & Mismatches \\
 \midrule
-Mixed set (four corpora) & $2{,}832$ & $130{,}537$ & $4$ & $522{,}004$ & $0$ & \rtacc{} \\
-\claudecode{} (large) & $5{,}000$ & $295{,}613$ & $3$ & $886{,}407$ & $0$ & \rtacc{} \\
-\codexcli{}           & $2{,}041$ & $152{,}706$ & $3$ & $457{,}962$ & $0$ & \rtacc{} \\
+Mixed set (four corpora) & $2{,}832$ & $130{,}537$ & $522{,}004$ & $492{,}429$ & $29{,}575$ & $0$ \\
+\claudecode{} (large) & $5{,}000$ & $295{,}613$ & $886{,}407$ & $828{,}974$ & $57{,}433$ & $0$ \\
+\codexcli{}           & $2{,}041$ & $152{,}706$ & $457{,}962$ & $455{,}040$ & $2{,}922$ & $0$ \\
 \midrule
-Total               & $\numtraj{}$ & $\numactions{}$ & & $1{,}866{,}373$ & $\mathbf{0}$ & $\mathbf{\rtacc{}}$ \\
+Total               & $\numtraj{}$ & $\numactions{}$ & $1{,}866{,}373$ & $1{,}776{,}443$ & $89{,}930$ & $\mathbf{0}$ \\
 \bottomrule
 \end{tabular}
 \end{small}
@@ -785,9 +792,10 @@ Agent harnesses differ far more on the surface than in substance: four
 production harnesses, ranging from four tools to twenty-one and from
 first-class file editors to nothing but a shell, reduce to twelve semantic
 actions covering $99.96\%$ of $\numactions{}$ real calls. Making that core explicit
-as the \HP{}, and verifying that the surface map is exactly invertible on those
-calls, in \numroundtrip{} render--parse checks, turns interface variation into
-something a training pipeline can marginalize over. \method{} does so with no new task data and no
+as the \HP{}, and verifying that the surface map is invertible on those calls,
+exactly in $95.2\%$ of \numroundtrip{} render--parse checks and up to an
+operational equivalence in the rest, turns interface variation into something a
+training pipeline can marginalize over. \method{} does so with no new task data and no
 architectural change: at an equal number of training steps it is no worse than
 a single-harness control on that control's harness, and ahead of it under every
 unseen production harness, by up to $8.7$ points. Aligning hidden
