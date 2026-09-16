@@ -141,10 +141,11 @@ harness its trajectories were collected in; moving the same model to a harness
 with different tools and conventions (\openhands{}, Codex) degrades
 performance on the same tasks. \textbf{Right:} \method{} parses each real
 trajectory down to the \HP{}, the small semantic core all harnesses
-share, and re-renders it into many counterfactual harnesses whose vocabulary,
-tool granularity, schema and documentation, observation format, and completion
-convention are independently resampled, training an agent that is invariant to
-the surface rather than bound to it.}
+share, and re-renders it into many counterfactual harnesses whose tool
+granularity and naming, prompt and tool documentation, observation formatting,
+and turn conventions are independently resampled, with the call syntax fixed by
+native function calling, training an agent that is invariant to the surface
+rather than bound to it.}
 \label{fig:overview}
 \end{figure}
 
@@ -238,13 +239,15 @@ turn and completion conventions. A harness is a point $h \in \mathcal{H}$;
 sampling a point is sampling a synthetic harness (Appendix~\ref{app:orbit}
 illustrates one trajectory under three such points).
 
-\paragraph{Proposition 1 (round-trip exactness).} \emph{For every
-$h \in \mathcal{H}$ realized by our renderer there is a parser $P_h$ with
-$P_h \circ R_h = \mathrm{id}$ on the action sequence of every protocol
-trajectory: exactly for the three syntax families with named tools, and up to
-an operational equivalence $\simeq$ (a file read and the shell command that
-performs it) for the shell-only family. In particular $R_h$ is injective on
-actions, modulo $\simeq$.} Appendix~\ref{app:proof} proves this by
+\paragraph{Proposition 1 (round-trip exactness).} \emph{Under the premises
+(P1)--(P4) of Appendix~\ref{app:premises}, for every $h \in \mathcal{H}$
+realized by our renderer there is a parser $P_h$ with $P_h \circ R_h =
+\mathrm{id}$ on the action sequence of every protocol trajectory: exactly for
+the three syntax families with named tools, and up to an operational
+equivalence $\simeq$ (a file read and the shell command that performs it; a
+final reply absorbed into the submission message) for the shell-only family
+and for the plain-reply completion convention of $A_5$. In particular $R_h$ is
+injective on actions, modulo $\simeq$.} Appendix~\ref{app:proof} proves this by
 construction, one stage at a time: granularity and naming form an injective
 table lookup, and each syntax family is a decodable encoding of the named
 record, with a JSON escape encoding for the few values a family cannot carry.
@@ -259,7 +262,8 @@ every argument: \numroundtrip{} render--parse checks in all. Agreement is
 $89{,}930$ ($4.8\%$), all in the shell family, agree up to $\simeq$ and are
 never counted as exact. Two consequences follow. First, the composition
 $T_{h \to h'} = R_{h'} \circ P_h$ is a well-defined, semantics-preserving
-translation between any two harnesses, so the protocol acts as a normal form. Second, the identifiability assumption behind
+translation between any two harnesses, exact on actions when $h'$ has named
+tools and exact up to $\simeq$ otherwise, so the protocol acts as a normal form. Second, the identifiability assumption behind
 augmentation-based representation learning, namely that the augmentation
 leaves \emph{content} untouched and perturbs only \emph{style}
 \citep{kugelgen2021self}, holds here by construction and by measurement, rather
@@ -305,7 +309,8 @@ Action & Share & Action & Share \\
 \begin{table}[t]
 \caption{Four production harnesses agree on semantics and disagree on
 everything else. ``Tools'' counts the standard declared schema; granularity is
-the $A_1$ setting each harness occupies.}
+the $A_1$ setting each harness occupies, where shell only means that files are
+read, searched and edited through shell commands rather than first-class tools.}
 \label{tab:harnesses}
 \begin{center}
 \begin{small}
@@ -394,10 +399,12 @@ independently from $\mathcal{H}$:
 \mathcal{D}_{\chr{}} \;=\;
 \Big\{\, R_{h}\!\left(P_{h_0}(\tau)\right) \;:\;
 \tau \in \mathcal{D}_{\text{real}},\;
-h \sim \mathrm{Unif}(\mathcal{H})^{M} \,\Big\}.
+h \sim \mathrm{Unif}(\mathcal{H}_{\mathrm{train}})^{M} \,\Big\},
 \end{equation}
-The semantic content of every sample is identical to a real, verified episode;
-only the surface is synthetic. This is domain randomization
+where $\mathcal{H}_{\mathrm{train}} \subset \mathcal{H}$ fixes the call syntax
+$A_2$ to native function calling and samples the four remaining axes. The
+semantic content of every sample is identical to a real, verified episode; only
+the surface is synthetic. This is domain randomization
 \citep{tobin2017domain} applied to the agent interface rather than to visual
 appearance, and the domain-generalization bound of \citet{benda2010theory}
 supplies the reason it should help: training over a distribution of surfaces
@@ -408,7 +415,8 @@ Rendered samples are emitted in the native function-calling format that
 production harnesses deploy: a top-level \texttt{tools} JSON schema, structured
 \texttt{tool\_calls}, and \texttt{tool\_call\_id}-linked tool messages. \chr{}
 data therefore merges directly with ordinary agent SFT data and preserves the
-base model's tool-calling ability.
+base model's tool-calling ability; the four text syntax families of
+Table~\ref{tab:roundtrip} serve the round-trip measurement, not training.
 
 \subsection{L2: Interface anonymization}
 
@@ -444,7 +452,9 @@ task instance. After dropping trajectories containing unmapped tools or fewer
 than three semantic actions, $8{,}677$ remain; \chr{} renders each into $M=3$
 counterfactual surfaces, yielding $\numsurfaces{}$ samples, each under its own
 surface configuration, with $21{,}476$ distinct tool names; $30\%$ of samples
-are anonymized. \method{} trains on these rendered samples alone. Both runs are
+are anonymized. The samples vary $A_1$, $A_3$, $A_4$ and $A_5$ ($10{,}335$
+split, $10{,}511$ unified-editor and $5{,}185$ monolithic surfaces) and all use
+native function calling. \method{} trains on these rendered samples alone. Both runs are
 full-parameter fine-tuning with a global batch of $128$ packed sequences of up
 to $256$K tokens and learning rate $5\times10^{-5}$ with cosine decay.
 
@@ -498,7 +508,7 @@ Harness & {V} & {M} & {V} & {M} & {V} & {M} \\
 \codexcli{}   & 58.6 & 49.7 & 68.0 & 61.3 & 68.6 & 59.3 \\
 \cham{}       & 67.2 & 55.0 & 70.8 & 62.3 & 67.2 & 60.0 \\
 \midrule
-Spread        & 9.0  & 8.6  & 3.4  & 7.0  & 2.6  & 3.0  \\
+Spread        & 9.0  & 8.7  & 3.4  & 7.0  & 2.6  & 3.0  \\
 \bottomrule
 \end{tabular}
 \end{small}
@@ -512,7 +522,7 @@ of the four production harnesses on Verified for all three open-weight models,
 while \openhands{}, with four tools, is the best or second best harness for the
 two Qwen models. The size of the spread is a property of the model: $9.0$
 points for Qwen3.5-35B-A3B, $3.4$ for Qwen3.6-35B-A3B and $2.6$ for
-KAT-Coder-V2.5-Dev on Verified, in the same order on Multilingual ($8.6$,
+KAT-Coder-V2.5-Dev on Verified, in the same order on Multilingual ($8.7$,
 $7.0$, $3.0$). KAT-Coder-V2.5-Dev, a model post-trained for agentic coding, is
 close to interface-invariant already; \method{} aims to obtain the same property
 from the training data alone.
@@ -581,8 +591,8 @@ Verified and $75.0\%$ against $68.7\%$ on Multilingual, although it never
 trained on \claudecode{}'s own surface. Under the three unseen production
 harnesses it is ahead on both benchmarks, by $2.8$, $4.5$ and $8.7$ points on
 Verified and by $1.5$, $2.3$ and $7.4$ on Multilingual. The largest gap is under
-\codexcli{}, whose shell-only surface lies outside the granularities \chr{}
-renders. The advantage is therefore largest where the control is weakest:
+\codexcli{}, whose shell-only surface lies outside the surfaces \chr{} renders
+for training (Section~\ref{sec:limits}). The advantage is therefore largest where the control is weakest:
 \method{}'s worst harness is $8.7$ points (Verified) and $7.4$ points
 (Multilingual) above the control's, and on Multilingual its five accuracies lie
 within $1.6$ points ($73.4$--$75.0\%$), a tighter range than the base model's
@@ -593,7 +603,7 @@ Multilingual), and behind in one.
 That one cell is \cham{} on Verified, where the control leads by $2.8$ points
 ($78.4\%$ against $75.6\%$). \cham{}'s configuration comes from the space
 \method{}'s training surfaces were sampled from, so this is not a failure to
-reach an unseen surface of the kind the other columns measure, and we do not
+reach an unseen surface of the kind the other production-harness rows measure, and we do not
 have an explanation for it. An earlier run of the same comparison on a weaker
 base model with a different recipe is reported in Appendix~\ref{app:e1-30b};
 there \method{}'s advantage appeared on Multilingual only.
@@ -691,7 +701,7 @@ are the four single-axis surfaces.}
 \label{fig:axes}
 \end{figure}
 
-Production harnesses differ on all surface axes at once, so neither
+Production harnesses differ on several surface axes at once, so neither
 Section~\ref{sec:step-matched} nor Section~\ref{sec:anon} can say which axis a
 model is bound to; \cham{} can move them one at a time. We start from an origin
 configuration that mimics \claudecode{}, with its split tools and their names
@@ -741,7 +751,7 @@ them. Of the $\numsurfaces{}$ rendered samples, $33\%$ carry at least one
 \opencode{} tool name and $21\%$ at least one \codexcli{} name; none carries an
 \openhands{} name, because that harness's names are excluded from the pool, and
 none presents any of the three as a coherent harness. \openhands{} is therefore
-the strictly zero-shot column of Table~\ref{tab:e1}; excluding each held-out
+the strictly zero-shot row of Table~\ref{tab:e1}; excluding each held-out
 harness's names in turn would make the others so.
 
 \paragraph{One model family, one source harness.} The main results use one
@@ -755,11 +765,13 @@ remains open.
 many surfaces from changing the surface once; that needs a control trained on
 one fixed rendering of the same trajectories.
 
-\paragraph{Rendering into shell-only surfaces is not yet supported.} Our
-renderer implements three granularities (split, unified editor, monolithic).
-\codexcli{}'s shell-only form is parsed but not rendered: transcoding
-\texttt{read\_file} into a shell command and recovering it is not exactly
-invertible and would forfeit the guarantee of Proposition~1.
+\paragraph{Shell-only surfaces.} Every training surface keeps first-class
+file tools, in one of three granularities (split, unified editor, monolithic).
+A shell-only surface, which lowers \texttt{read\_file} and \texttt{search} into
+shell commands, exists in our renderer only as the text syntax family of
+Table~\ref{tab:roundtrip}, where the round trip is exact only up to $\simeq$;
+\codexcli{}'s surface is therefore parsed but never rendered into training
+data.
 
 \section{Related Work}
 \label{sec:related}
@@ -1029,8 +1041,9 @@ completion convention of $A_5$); we count them under $\simeq$. $\square$
 
 Two remarks. First, the composition $T_{h\to h'}=R_{h'}\circ P_h$ is defined
 on the image of $R_h$, so it is a total map between surfaces, and
-$P_{h'}\circ T_{h\to h'}=P_h$ on that image: transport preserves the action
-sequence exactly. Second, the observation channel is decorated rather than
+$P_{h'}\circ T_{h\to h'}=P_h$ on that image when $h'$ has named tools, and
+$\simeq P_h$ when $h'$ is the shell family: transport preserves the action
+sequence, exactly or up to $\simeq$. Second, the observation channel is decorated rather than
 encoded: $A_4$ adds line-number gutters on file views, wrapper tags, and
 empty-output and error markers, all of which are stripped by the inverse
 decoration, and may truncate long outputs to a character budget. Truncation
@@ -1063,10 +1076,11 @@ values rather than real ones: $600$ sampled configurations across all
 families, each rendering $72$ actions whose arguments contain every family's
 delimiters, empty strings, outer whitespace and newlines, Unicode and
 $10{,}000$-character payloads, for $43{,}200$ render-parse pairs with zero
-mismatches. Four of the escape conditions of Lemma~3 (a path with outer
-whitespace or containing the terminator, a whitespace-only submission, a task
-list containing a block opener, a replace-all edit) were added as a result of
-this check; none of them occurs in the corpora of Table~\ref{tab:roundtrip}.
+mismatches. Four of the special cases of Lemma~3 (a path with outer whitespace
+or containing the terminator, a task list containing a block opener and a
+replace-all edit, which go to $E_{\mathrm{esc}}$, and the whitespace-only
+submission, which becomes the filler) were added as a result of this check;
+none of them occurs in the corpora of Table~\ref{tab:roundtrip}.
 
 \subsection{One trajectory, three surfaces}
 \label{app:orbit}
@@ -1411,12 +1425,13 @@ to read the tool documentation in front of it has nothing to fall back on.
 
 Before the experiment of Section~\ref{sec:step-matched} we ran the same comparison at a
 smaller scale on Qwen3-30B-A3B-Instruct-2507 \citep{qwen3}, with a different
-recipe on both sides. The data were $5{,}000$ \claudecode{} trajectories, of
-which $4{,}133$ survived the filters of Section~\ref{sec:exp}; \chr{} rendered
-each into $M=2$ surfaces, giving $8{,}266$ samples under $8{,}204$ distinct
-surface configurations with $11{,}205$ distinct tool names. \method{} trained on
-the real trajectories \emph{mixed with} their renderings and the control on the
-real trajectories alone, each for $215$ optimizer steps at a global batch of
+recipe on both sides. The data were $5{,}000$ \claudecode{} trajectories;
+\chr{} rendered the $4{,}133$ of them that passed the filters of
+Section~\ref{sec:exp} into $M=2$ surfaces each, giving $8{,}266$ samples under
+$8{,}204$ distinct surface configurations with $11{,}205$ distinct tool names.
+\method{} trained on all $5{,}000$ real trajectories \emph{mixed with} the
+$8{,}266$ renderings ($13{,}266$ samples) and the control on the real
+trajectories alone, each for $215$ optimizer steps at a global batch of
 $32$ and learning rate $5\times10^{-5}$; for the control this is about $6.2$
 passes over its data. Matching sample counts instead would have given the
 control $27\%$ more tokens, since the rendered samples are $34\%$ shorter than
@@ -1445,12 +1460,12 @@ Harness & {Base} & {Control} & {\method{}} & {$\Delta$} & {Base} & {Control} & {
 \end{center}
 \end{table}
 
-Table~\ref{tab:e1-30b} gives the result. The one difference beyond the noise
-floor is the unseen-harness, unseen-language cell, where \method{} gains $7.7$
-points ($93/300$ against $70/300$; two-proportion $z\approx2.11$,
-$p\approx0.035$). Measured as the accuracy each model loses when moved from
-\claudecode{} to \opencode{}, \method{} loses $4.7$ points on Multilingual
-against the control's $10.4$, but $6.2$ on Verified against the control's
+Table~\ref{tab:e1-30b} gives the result. Two differences exceed the noise
+floor, both on Multilingual: $2.0$ points on \claudecode{} and $7.7$ points in
+the unseen-harness cell, \opencode{} ($93/300$ against $70/300$; two-proportion
+$z\approx2.11$, $p\approx0.035$). Measured as the accuracy each model loses
+when moved from \claudecode{} to \opencode{}, \method{} loses $4.7$ points on
+Multilingual against the control's $10.3$, but $6.2$ on Verified against the control's
 $4.8$: on Verified this run shows no benefit. \openhands{} was also run and is
 not reported. Both models timed out at high rates ($25\%$ and $64\%$ of settled
 trials), traced to a proactive-compaction threshold set above the context
@@ -1467,6 +1482,12 @@ has network access. An episode whose tool observations show that the agent
 obtained the reference fix in either way is scored as a failure whatever the
 verifier says. In Table~\ref{tab:e0} this changes a cell by at most $3.2$ points on Verified and
 $9.3$ points on Multilingual. \todo{apply the same audit to Table~\ref{tab:e1}}
+
+\paragraph{Rounding.} Pass rates are pass counts over task counts, shown to
+one decimal. Spreads and the differences quoted in the text are computed from
+the counts for single-evaluation cells and from the per-cell means shown for
+the three-evaluation cells of Table~\ref{tab:e1}, then rounded once, so they
+can differ from the difference of two displayed values by $0.1$.
 
 \paragraph{Noise floor.} Repeated submissions of an identical configuration
 give a single-evaluation noise floor of $\pm2.0$ points on the $500$-task set
