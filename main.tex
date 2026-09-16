@@ -39,9 +39,9 @@
 % baseline
 \newcommand{\control}{step-matched control}
 % headline measurements (single source of truth)
-\newcommand{\numactions}{578{,}856}       % semantic actions across 5 harnesses
+\newcommand{\numactions}{578{,}856}       % tool calls parsed from the four harness corpora
 \newcommand{\numtraj}{9{,}873}            % trajectories parsed
-\newcommand{\numroundtrip}{1.87M}         % actions in the round-trip check
+\newcommand{\numroundtrip}{1.87M}         % render-parse checks (578,856 actions x 3-4 sampled surfaces each)
 \newcommand{\rtacc}{100.0000\%}           % round-trip consistency
 \newcommand{\numsurfaces}{26{,}031}       % distinct surface configs in training (one per rendered sample)
 % utilities
@@ -79,8 +79,8 @@ We find that this variation is largely superficial. Across four production
 harnesses, diverse tool interfaces reduce to a shared set of only $12$ semantic
 actions. We formalize this common action space as the \HP{} and develop
 semantics-preserving transformations between the protocol and concrete
-harness interfaces, verified with zero mismatches over \numroundtrip{} real
-actions. Building on this representation, we introduce \method{}
+harness interfaces, verified with zero mismatches in \numroundtrip{} render--parse
+checks over \numactions{} real actions. Building on this representation, we introduce \method{}
 (Harness-INvariant Training), which re-renders each training trajectory under
 counterfactual harness interfaces and anonymizes interface-specific cues,
 encouraging the model to learn action semantics rather than memorize tool
@@ -160,8 +160,8 @@ surface decomposes into five axes that can be set independently: tool
 granularity and naming, call syntax, prompt documentation, observation
 formatting, and turn conventions. The abstraction is not lossy: rendering a
 protocol trajectory into a surface and parsing it back recovers the original
-action sequence exactly, measured over \numroundtrip{} actions at \rtacc{}
-(Section~\ref{sec:protocol}). This is a \emph{descriptive} claim about
+action sequence exactly, measured at \rtacc{} in \numroundtrip{} render--parse
+checks over all \numactions{} actions (Section~\ref{sec:protocol}). This is a \emph{descriptive} claim about
 harnesses that already exist, not a proposal for a new standard.
 
 Exact invertibility is what turns the protocol from an analysis tool into a
@@ -195,8 +195,9 @@ marginalize over. Our contributions are summarized as follows:
   (Sections~\ref{sec:harness-choice} and~\ref{sec:step-matched}).
 \item \textbf{The \HP{}, with an exactness guarantee that is measured rather
   than assumed.} A $12$-action vocabulary covers $99.96\%$ of \numactions{} real
-  calls from four harnesses; surface rendering is exactly invertible on
-  \numroundtrip{} actions (Section~\ref{sec:protocol}).
+  calls from four harnesses; surface rendering is exactly invertible on those
+  calls, verified in \numroundtrip{} render--parse checks
+  (Section~\ref{sec:protocol}).
 \item \textbf{\method{}}, a training method that multiplies existing
   trajectories along the surface axes, needing no new task data and no
   architecture change (Section~\ref{sec:method}).
@@ -245,10 +246,12 @@ construction, one stage at a time: granularity and naming form an injective
 table lookup, and each syntax family is a decodable encoding of the named
 record, with a JSON escape encoding for the few values a family cannot carry.
 The proof covers the design; Table~\ref{tab:roundtrip} checks that the
-implementation meets the proof's premises on real data. For each of
-\numroundtrip{} actions drawn from six corpora we render under randomly
-sampled configurations spanning all four call-syntax families and parse the
-result back, comparing the action verb and every argument. Agreement is
+implementation meets the proof's premises on real data. We take every action
+of the \numtraj{} parsed trajectories (\numactions{} calls; the $232$ calls
+outside the vocabulary have no protocol form and are excluded), render each
+under three or four independently sampled configurations spanning all four
+call-syntax families, and parse the result back, comparing the action verb and
+every argument: \numroundtrip{} render--parse checks in all. Agreement is
 \rtacc{} with zero mismatches; $\simeq$ cases are counted as consistent, never
 as exact. Two consequences follow. First, the composition
 $T_{h \to h'} = R_{h'} \circ P_h$ is a well-defined, semantics-preserving
@@ -328,21 +331,24 @@ exactly the regime in which a surface-bound policy fails and an
 interface-invariant one should not.
 
 \begin{table}[t]
-\caption{Round-trip exactness. Each corpus is rendered under randomly sampled
-surface configurations and parsed back; an action counts as exact when its verb
-and all arguments match.}
+\caption{Round-trip exactness. Every action of each corpus is rendered under
+three or four randomly sampled surface configurations (``Renderings'') and
+parsed back; a check counts as exact when the verb and all arguments match.
+The $232$ calls outside the vocabulary (Table~\ref{tab:vocab}) have no protocol
+form and are not rendered.}
 \label{tab:roundtrip}
 \begin{center}
 \begin{small}
-\begin{tabular}{lrrrr}
+\setlength{\tabcolsep}{4.5pt}
+\begin{tabular}{lrrrrrr}
 \toprule
-Corpus & Trajectories & Actions checked & Mismatches & Consistency \\
+Corpus & Trajectories & Actions & Renderings & Checks & Mismatches & Consistency \\
 \midrule
-Mixed set (four corpora) & $2{,}832$ & $522{,}004$ & $0$ & \rtacc{} \\
-\claudecode{} (large) & $5{,}000$ & $886{,}407$ & $0$ & \rtacc{} \\
-\codexcli{}           & $2{,}041$ & $457{,}962$ & $0$ & \rtacc{} \\
+Mixed set (four corpora) & $2{,}832$ & $130{,}537$ & $4$ & $522{,}004$ & $0$ & \rtacc{} \\
+\claudecode{} (large) & $5{,}000$ & $295{,}613$ & $3$ & $886{,}407$ & $0$ & \rtacc{} \\
+\codexcli{}           & $2{,}041$ & $152{,}706$ & $3$ & $457{,}962$ & $0$ & \rtacc{} \\
 \midrule
-Total               & $\numtraj{}$ & $1{,}866{,}373$ & $\mathbf{0}$ & $\mathbf{\rtacc{}}$ \\
+Total               & $\numtraj{}$ & $\numactions{}$ & & $1{,}866{,}373$ & $\mathbf{0}$ & $\mathbf{\rtacc{}}$ \\
 \bottomrule
 \end{tabular}
 \end{small}
@@ -779,9 +785,9 @@ Agent harnesses differ far more on the surface than in substance: four
 production harnesses, ranging from four tools to twenty-one and from
 first-class file editors to nothing but a shell, reduce to twelve semantic
 actions covering $99.96\%$ of $\numactions{}$ real calls. Making that core explicit
-as the \HP{}, and verifying that the surface map is exactly invertible over
-\numroundtrip{} actions, turns interface variation into something a training pipeline
-can marginalize over. \method{} does so with no new task data and no
+as the \HP{}, and verifying that the surface map is exactly invertible on those
+calls, in \numroundtrip{} render--parse checks, turns interface variation into
+something a training pipeline can marginalize over. \method{} does so with no new task data and no
 architectural change: at an equal number of training steps it is no worse than
 a single-harness control on that control's harness, and ahead of it under every
 unseen production harness, by up to $8.7$ points. Aligning hidden
@@ -1039,11 +1045,12 @@ every argument when it maps a harness call to a protocol action.
 
 The proof covers the design of the maps; the measurement of
 Table~\ref{tab:roundtrip} covers the implementation and the data. Rendering
-\numroundtrip{} real actions under randomly sampled configurations and parsing
-them back checks (a) that the code realizes the encodings described above and
-(b) that the corpus satisfies (P3) and (P4). Both hold: zero mismatches, with
-the $\simeq$ cases of the shell family ($89{,}930$ actions, $4.8\%$ of the
-total) counted as consistent but never as exact. A mechanical companion check exercises the encodings on adversarial
+all \numactions{} real actions under three or four randomly sampled
+configurations each, \numroundtrip{} render--parse pairs, and parsing them back
+checks (a) that the code realizes the encodings described above and (b) that
+the corpus satisfies (P3) and (P4). Both hold: zero mismatches, with the
+$\simeq$ cases of the shell family ($89{,}930$ checks, $4.8\%$ of the total)
+counted as consistent but never as exact. A mechanical companion check exercises the encodings on adversarial
 values rather than real ones: $600$ sampled configurations across all
 families, each rendering $72$ actions whose arguments contain every family's
 delimiters, empty strings, outer whitespace and newlines, Unicode and
