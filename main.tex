@@ -454,8 +454,10 @@ arbitrary synthetic harnesses.
 \subsection{Setup}
 \label{sec:setup}
 \paragraph{Model and data.} We fine-tune \basemodel{}
-\citep{qwen3} on $9{,}366$ \claudecode{} trajectories over SWE tasks, one per
-task instance. Normalization moves every call out of the text channels, and we
+\citep{qwen3} on $9{,}366$ \claudecode{} trajectories collected with GLM-5.3
+as the teacher on SWE-rebench-V2 instances \citep{badertdinov2025swerebench},
+one per task instance; the instances are deduplicated against both evaluation
+benchmarks, so no training task appears in \swev{} or \swem{}. Normalization moves every call out of the text channels, and we
 check that no call text remains in the reasoning or observations of any kept
 trajectory. After dropping trajectories containing unmapped tools or fewer than
 three semantic actions, $8{,}677$ remain; \chr{} renders each into $M=3$
