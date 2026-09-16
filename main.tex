@@ -616,8 +616,9 @@ there \method{}'s advantage appeared on Multilingual only.
 \includegraphics[width=\textwidth]{pic/real_harness_data.pdf}
 \end{center}
 \caption{\method{} versus a model trained on real trajectories from three
-harnesses, both Qwen3-30B-A3B-Instruct-2507 fine-tuned for $215$ steps, under
-\claudecode{} and \opencode{} (pass@1, one evaluation per cell).}
+harnesses, both fine-tuned from Qwen3-30B-A3B-Instruct-2507 for the same
+number of steps, under \claudecode{} and \opencode{} (pass@1, one evaluation
+per cell).}
 \label{fig:real}
 \end{figure}
 
@@ -628,7 +629,7 @@ Qwen3-30B-A3B-Instruct-2507, the base model of Appendix~\ref{app:e1-30b}. The
 mixed with their \chr{} renderings. The alternative trains on the same
 $5{,}000$ \claudecode{} trajectories together with $3{,}908$ real \opencode{}
 and $4{,}182$ real \openhands{} trajectories, $13{,}090$ in all, with the same
-schedule and the same $215$ optimizer steps. Both models are evaluated under
+schedule and the same number of optimizer steps. Both models are evaluated under
 \claudecode{} and \opencode{}, the two harnesses on which both were run under the
 same conditions; neither set of runs is leak-audited. Both harnesses occur in
 the training data of the model trained on real trajectories, whereas
@@ -650,8 +651,9 @@ trajectories came from. \todo{extend to \openhands{}, \codexcli{} and \cham{} on
 \begin{center}
 \includegraphics[width=\textwidth]{pic/anon_names.pdf}
 \end{center}
-\caption{Anonymizing tool and parameter names under \cham{} on \swem{}, one
-evaluation per setting. \textbf{(a)}~Pass@1 as more names are replaced.
+\caption{Anonymizing tool and parameter names under \cham{} on \swem{}, for
+\basemodel{} before fine-tuning and the \method{} model of Table~\ref{tab:e1},
+one evaluation per setting. \textbf{(a)}~Pass@1 as more names are replaced.
 \textbf{(b)}~Tasks whose outcome flips when all names are replaced.}
 \label{fig:anon}
 \end{figure}
@@ -666,9 +668,10 @@ parameters), we replace about half of the tool and parameter names (four and
 eight, respectively), and then all of them, with meaningless identifiers, so
 that, for example, \texttt{run\_command} becomes \texttt{zete}. The tool
 descriptions are identical across settings and the system prompt names no
-tool, so what each tool does remains readable throughout. Each model is
-evaluated once per setting on \swem{} and compared only with its own run under
-the original names; because these runs are separate from those of
+tool, so what each tool does remains readable throughout. \basemodel{} before
+fine-tuning and the \method{} model of Table~\ref{tab:e1} are each evaluated
+once per setting on \swem{} and compared only with their own run under the
+original names; because these runs are separate from those of
 Tables~\ref{tab:e0} and~\ref{tab:e1} and not leak-audited, only differences
 between settings are interpreted. As Figure~\ref{fig:anon} shows, \method{}'s
 accuracy is unchanged ($74.3\%$, $74.6\%$ and $74.3\%$), and with all names
@@ -716,11 +719,13 @@ reminder, adds a turn header, returns observations as user turns and ends an
 episode with a finish call. Two further surfaces change A1 and A5 together and
 all four axes. The call syntax (A2) is fixed by native function calling, and
 every surface exposes the same actions. We evaluate the \method{} model of
-Appendix~\ref{app:e1-30b} and a control trained on the same \claudecode{}
-trajectories alone, once per surface on \swem{}; these runs are not
-leak-audited, and the few episodes still running when a cell was closed (at
-most $15$ of $300$) are excluded, so only differences between surfaces are
-interpreted. The control is bound to A1 (Figure~\ref{fig:axes}a): changing
+Appendix~\ref{app:e1-30b} and a control fine-tuned from the same base model,
+Qwen3-30B-A3B-Instruct-2507, on the same \claudecode{} trajectories alone, once
+per surface on \swem{}. These runs use a different evaluation environment from
+Appendix~\ref{app:e1-30b}, are not leak-audited, and exclude the few episodes
+still running when a cell was closed (at most $15$ of $300$), so their absolute
+accuracies are not comparable with Table~\ref{tab:e1-30b} and only differences
+between surfaces are interpreted. The control is bound to A1 (Figure~\ref{fig:axes}a): changing
 naming and granularity alone takes it from $15.1\%$ on the origin to $3.3\%$,
 and it stays at that level whenever A1 is changed ($3.8\%$ with A1 and A5,
 $3.4\%$ with all four axes), whereas changing A3, A4 or A5 alone leaves it
@@ -1431,8 +1436,8 @@ Section~\ref{sec:exp} into $M=2$ surfaces each, giving $8{,}266$ samples under
 $8{,}204$ distinct surface configurations with $11{,}205$ distinct tool names.
 \method{} trained on all $5{,}000$ real trajectories \emph{mixed with} the
 $8{,}266$ renderings ($13{,}266$ samples) and the control on the real
-trajectories alone, each for $215$ optimizer steps at a global batch of
-$32$ and learning rate $5\times10^{-5}$; for the control this is about $6.2$
+trajectories alone, each for the same number of optimizer steps at a global
+batch of $32$ and learning rate $5\times10^{-5}$; for the control this is about $6.2$
 passes over its data. Matching sample counts instead would have given the
 control $27\%$ more tokens, since the rendered samples are $34\%$ shorter than
 the originals. Each cell was evaluated once, through a different serving
