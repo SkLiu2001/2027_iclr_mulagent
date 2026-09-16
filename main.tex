@@ -585,6 +585,41 @@ have an explanation for it. An earlier run of the same comparison on a weaker
 base model with a different recipe is reported in Appendix~\ref{app:e1-30b};
 there \method{}'s advantage appeared on Multilingual only.
 
+\subsection{Real trajectories from more harnesses}
+\label{sec:real}
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{pic/real_harness_data.pdf}
+\end{center}
+\caption{\method{} versus a model trained on real trajectories from three
+harnesses, both Qwen3-30B-A3B-Instruct-2507 fine-tuned for $215$ steps, under
+\claudecode{} and \opencode{} (pass@1, one evaluation per cell).}
+\label{fig:real}
+\end{figure}
+
+A direct alternative to rendering counterfactual surfaces is to collect real
+trajectories in several harnesses, and we compare the two on
+Qwen3-30B-A3B-Instruct-2507, the base model of Appendix~\ref{app:e1-30b}. The
+\method{} model of that appendix trains on $5{,}000$ \claudecode{} trajectories
+mixed with their \chr{} renderings. The alternative trains on the same
+$5{,}000$ \claudecode{} trajectories together with $3{,}908$ real \opencode{}
+and $4{,}182$ real \openhands{} trajectories, $13{,}090$ in all, with the same
+schedule and the same $215$ optimizer steps. Both models are evaluated under
+\claudecode{} and \opencode{}, the two harnesses on which both were run under the
+same conditions; neither set of runs is leak-audited. Both harnesses occur in
+the training data of the model trained on real trajectories, whereas
+\opencode{} is unseen for \method{}. As Figure~\ref{fig:real} shows, \method{} is
+more accurate under \claudecode{}, $48.2\%$ against $31.8\%$ on Verified and
+$35.7\%$ against $21.0\%$ on Multilingual, and under \opencode{} on
+Multilingual, $31.0\%$ against $20.7\%$, although the other model was trained
+on \opencode{} trajectories; on \opencode{} Verified the two are close
+($42.0\%$ and $38.2\%$). At a fixed training budget, spending part of it on real
+trajectories from two more harnesses lowered accuracy on the source harness and
+did not match \method{} on \opencode{} Multilingual, one of the harnesses those
+trajectories came from. \todo{extend to \openhands{}, \codexcli{} and \cham{} once
+\method{} is evaluated there}
+
 \subsection{Anonymizing the interface at test time}
 \label{sec:anon}
 
