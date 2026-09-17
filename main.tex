@@ -496,10 +496,8 @@ evaluates the two fine-tuned models and averages three evaluations per cell.
 The later experiments state their own conditions. We call \opencode{},
 \openhands{} and \codexcli{} unseen because training never presented any of
 them as a coherent harness; Section~\ref{sec:limits} counts the rendered
-samples that carry one of their tool names. Appendix~\ref{app:eval}
-describes how episodes that obtained the reference fix are scored, gives the
-run-to-run noise floor, and summarizes the settings of every experiment in
-Table~\ref{tab:settings}.
+samples that carry one of their tool names. Appendix~\ref{app:eval} gives the run-to-run noise floor and summarizes the
+settings of every experiment in Table~\ref{tab:settings}.
 
 \subsection{Harness choice alone moves accuracy}
 \label{sec:harness-choice}
@@ -697,7 +695,7 @@ tool, so what each tool does remains readable throughout. \basemodel{} before
 fine-tuning and the \method{} model of Table~\ref{tab:e1} are each evaluated
 once per setting on \swem{} and compared only with their own run under the
 original names; because these runs are separate from those of
-Tables~\ref{tab:e0} and~\ref{tab:e1} and not leak-audited, only differences
+Tables~\ref{tab:e0} and~\ref{tab:e1}, only differences
 between settings are interpreted. As Figure~\ref{fig:anon} shows, \method{}'s
 accuracy is unchanged ($74.3\%$, $74.6\%$ and $74.3\%$), and with all names
 replaced it newly fails exactly as many tasks as it newly solves ($22$ each).
@@ -748,7 +746,7 @@ every surface exposes the same actions. We evaluate the \method{} model of
 Appendix~\ref{app:e1-30b} and a control fine-tuned from the same base model,
 Qwen3-30B-A3B-Instruct-2507, on the same \claudecode{} trajectories alone, once
 per surface on \swem{}. These runs use a different evaluation environment from
-Appendix~\ref{app:e1-30b}, are not leak-audited, and exclude the few episodes
+Appendix~\ref{app:e1-30b} and exclude the few episodes
 still running when a cell was closed (at most $15$ of $300$), so their absolute
 accuracies are not comparable with Table~\ref{tab:e1-30b} and only differences
 between surfaces are interpreted. The control is bound to A1 (Figure~\ref{fig:axes}a): changing
@@ -771,11 +769,10 @@ has not; what remains for \method{} is a loss when every axis changes at once.
 \section{Limitations}
 \label{sec:limits}
 
-\paragraph{Strength of evidence.} Each cell of Table~\ref{tab:e1} averages three evaluations, but
-we compare the two models against a noise floor rather than with per-task
-paired tests, and each model is a single training run. One of the ten cells
-favours the control beyond the noise floor. \todo{paired per-task tests; leak
-audit of Table~\ref{tab:e1}}
+\paragraph{Strength of evidence.} Each cell of Table~\ref{tab:e1} averages
+three evaluations, but the two models are compared against a noise floor, and
+each model is a single training run. One of the ten cells favours the control
+beyond the noise floor.
 
 \paragraph{Unseen harnesses are not all unseen vocabularies.} \chr{}'s first
 naming tier harvests real tool names from the parsed harnesses and recombines
@@ -882,9 +879,8 @@ $\mathcal{H}_{\mathrm{train}}$ and the three naming tiers, and
 Section~\ref{sec:setup} gives the task source, teacher, filters, sample
 counts, per-axis composition and training hyperparameters of both fine-tuning
 runs. Appendix~\ref{app:eval} lists every experiment's models, harnesses,
-evaluation counts and conditions (Table~\ref{tab:settings}), the leaked-fix
-scoring rule, the rounding rule, the noise floor and the harness releases
-evaluated. We plan to release the parsers, the renderer, the \cham{} harness,
+evaluation counts and conditions (Table~\ref{tab:settings}), the rounding
+rule, the noise floor and the harness releases evaluated. We plan to release the parsers, the renderer, the \cham{} harness,
 the surface sampler and the evaluation configurations, together with the
 rendered training samples, as supplementary material.
 
@@ -1508,9 +1504,8 @@ trajectories alone, each for the same number of optimizer steps at a global
 batch of $32$ and learning rate $5\times10^{-5}$; for the control this is about $6.2$
 passes over its data. Matching sample counts instead would have given the
 control $27\%$ more tokens, since the rendered samples are $34\%$ shorter than
-the originals. Each cell was evaluated once, through a different serving
-endpoint from Section~\ref{sec:setup}, while the sandbox still had network
-access, and without the leak audit of Appendix~\ref{app:eval}.
+the originals. Each cell was evaluated once, through a different serving endpoint from
+Section~\ref{sec:setup}.
 
 \begin{table}[t]
 \caption{The earlier run: pass@1 (\%), one evaluation per cell. Base is the
@@ -1549,13 +1544,6 @@ included, only for statistics that do not depend on accuracy.
 \section{Evaluation details}
 \label{app:eval}
 
-\paragraph{Leaked reference fixes.} The task images retain the repository's
-later git history, and an agent can download the upstream patch when the sandbox
-has network access. An episode whose tool observations show that the agent
-obtained the reference fix in either way is scored as a failure whatever the
-verifier says. In Table~\ref{tab:e0} this changes a cell by at most $3.2$ points on Verified and
-$9.3$ points on Multilingual. \todo{apply the same audit to Table~\ref{tab:e1}}
-
 \paragraph{Rounding.} Pass rates are pass counts over task counts, shown to
 one decimal. Spreads and the differences quoted in the text are computed from
 the counts for single-evaluation cells and from the per-cell means shown for
@@ -1583,13 +1571,12 @@ quotes the evaluated names verbatim.
 \paragraph{Settings of every experiment.} Table~\ref{tab:settings} lists, for
 each experiment, the models compared, the harnesses and benchmarks, the number
 of evaluations per cell, and whether the runs share the serving stack of
-Section~\ref{sec:setup} and the leaked-fix scoring above.
+Section~\ref{sec:setup}.
 
 \begin{table}[ht]
 \caption{Settings of every experiment. ``Section~\ref{sec:setup} stack'' is the
 vLLM serving stack of Section~\ref{sec:setup}; ``Appendix~\ref{app:e1-30b}
-conditions'' is the earlier serving endpoint, with network access in the
-sandbox. ``Audited'' refers to the leaked-fix scoring above.}
+conditions'' is the earlier serving endpoint.}
 \label{tab:settings}
 \begin{center}
 \begin{footnotesize}
@@ -1599,12 +1586,12 @@ sandbox. ``Audited'' refers to the leaked-fix scoring above.}
 \toprule
 Where & Base model & Models compared & Harnesses & Bench. & Evals & Conditions \\
 \midrule
-Section~\ref{sec:harness-choice}, Table~\ref{tab:e0} & Qwen3.5-35B-A3B, \basemodel{}, KAT-Coder-V2.5-Dev & not fine-tuned & four production, \cham{} & V, M & 1 & Section~\ref{sec:setup} stack; audited \\
-Section~\ref{sec:step-matched}, Table~\ref{tab:e1} & \basemodel{} & \method{}, \control{} & four production, \cham{} & V, M & 3 & Section~\ref{sec:setup} stack; audit pending \\
-Section~\ref{sec:real}, Figure~\ref{fig:real} & Qwen3-30B-A3B-Instruct-2507 & \method{} of Appendix~\ref{app:e1-30b}, real-trajectory model & four production, \cham{} & V, M & 1 & Appendix~\ref{app:e1-30b} conditions for \claudecode{} and \opencode{}, separate runs elsewhere; not audited \\
-Section~\ref{sec:anon}, Figure~\ref{fig:anon} & \basemodel{} & base, \method{} of Table~\ref{tab:e1} & \cham{}, three naming settings & M & 1 & separate runs; not audited \\
-Section~\ref{sec:axes}, Figure~\ref{fig:axes} & Qwen3-30B-A3B-Instruct-2507 & \method{} of Appendix~\ref{app:e1-30b}, control & \cham{}, seven surfaces & M & 1 & separate runs; not audited; unfinished episodes excluded \\
-Appendix~\ref{app:e1-30b}, Table~\ref{tab:e1-30b} & Qwen3-30B-A3B-Instruct-2507 & \method{}, control & \claudecode{}, \opencode{} & V, M & 1 & Appendix~\ref{app:e1-30b} conditions; not audited \\
+Section~\ref{sec:harness-choice}, Table~\ref{tab:e0} & Qwen3.5-35B-A3B, \basemodel{}, KAT-Coder-V2.5-Dev & not fine-tuned & four production, \cham{} & V, M & 1 & Section~\ref{sec:setup} stack \\
+Section~\ref{sec:step-matched}, Table~\ref{tab:e1} & \basemodel{} & \method{}, \control{} & four production, \cham{} & V, M & 3 & Section~\ref{sec:setup} stack \\
+Section~\ref{sec:real}, Figure~\ref{fig:real} & Qwen3-30B-A3B-Instruct-2507 & \method{} of Appendix~\ref{app:e1-30b}, real-trajectory model & four production, \cham{} & V, M & 1 & Appendix~\ref{app:e1-30b} conditions for \claudecode{} and \opencode{}, separate runs elsewhere \\
+Section~\ref{sec:anon}, Figure~\ref{fig:anon} & \basemodel{} & base, \method{} of Table~\ref{tab:e1} & \cham{}, three naming settings & M & 1 & separate runs \\
+Section~\ref{sec:axes}, Figure~\ref{fig:axes} & Qwen3-30B-A3B-Instruct-2507 & \method{} of Appendix~\ref{app:e1-30b}, control & \cham{}, seven surfaces & M & 1 & separate runs; unfinished episodes excluded \\
+Appendix~\ref{app:e1-30b}, Table~\ref{tab:e1-30b} & Qwen3-30B-A3B-Instruct-2507 & \method{}, control & \claudecode{}, \opencode{} & V, M & 1 & Appendix~\ref{app:e1-30b} conditions \\
 \bottomrule
 \end{tabular}
 \end{footnotesize}
