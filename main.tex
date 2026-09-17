@@ -100,7 +100,9 @@ fundamental source of distribution shift for SWE agents.
 
 Recent years have seen rapid progress in LLM agents for software engineering.
 Given an issue reported against a real GitHub repository, an agent such as
-\claudecode{}, \codexcli{}, \opencode{} or \openhands{} explores the codebase,
+\claudecode{} \citep{anthropic2025claudecode}, \codexcli{}
+\citep{openai2025codex}, \opencode{} \citep{opencode2025} or \openhands{}
+\citep{wang2025openhandssdk} explores the codebase,
 edits files, runs tests, and returns a patch, and SWE-bench
 \citep{jimenez2024swebench} has become the standard measure of how often that
 patch is correct. Underneath every such agent is a language model wrapped in a
@@ -453,9 +455,9 @@ arbitrary synthetic harnesses.
 
 \subsection{Setup}
 \label{sec:setup}
-\paragraph{Model and data.} We fine-tune \basemodel{}
-\citep{qwen3} on $9{,}366$ \claudecode{} trajectories collected with GLM-5.3
-as the teacher on SWE-rebench-V2 instances \citep{badertdinov2025swerebench},
+\paragraph{Model and data.} We fine-tune \basemodel{} \citep{qwen36card} on
+$9{,}366$ \claudecode{} trajectories collected with GLM-5.3 \citep{glm53card}
+as the teacher on SWE-rebench-V2 instances \citep{badertdinov2026swerebenchv2},
 one per task instance; the instances are deduplicated against both evaluation
 benchmarks, so no training task appears in \swev{} or \swem{}. Normalization moves every call out of the text channels, and we
 check that no call text remains in the reasoning or observations of any kept
@@ -489,9 +491,10 @@ JavaScript, TypeScript, PHP, Ruby and Rust). In
 Sections~\ref{sec:harness-choice} and~\ref{sec:step-matched}, every model
 runs under the four production harnesses of Table~\ref{tab:harnesses} and
 under \cham{} with one fixed configuration, and all models are served with
-vLLM on the same serving stack; Section~\ref{sec:harness-choice} evaluates
-three open-weight models, Qwen3.5-35B-A3B, Qwen3.6-35B-A3B and
-KAT-Coder-V2.5-Dev, once per cell, and Section~\ref{sec:step-matched}
+vLLM \citep{kwon2023vllm} on the same serving stack;
+Section~\ref{sec:harness-choice} evaluates three open-weight models,
+Qwen3.5-35B-A3B \citep{qwen35card}, \basemodel{} and KAT-Coder-V2.5-Dev
+\citep{huang2026katcoder}, once per cell, and Section~\ref{sec:step-matched}
 evaluates the two fine-tuned models and averages three evaluations per cell.
 The later experiments state their own conditions. We call \opencode{},
 \openhands{} and \codexcli{} unseen because training never presented any of
@@ -538,9 +541,9 @@ while \openhands{}, with four tools, is the best or second best harness for the
 two Qwen models. The size of the spread is a property of the model: $9.0$
 points for Qwen3.5-35B-A3B, $3.4$ for Qwen3.6-35B-A3B and $2.6$ for
 KAT-Coder-V2.5-Dev on Verified, in the same order on Multilingual ($8.7$,
-$7.0$, $3.0$). KAT-Coder-V2.5-Dev, a model post-trained for agentic coding, is
-close to interface-invariant already; \method{} aims to obtain the same property
-from the training data alone.
+$7.0$, $3.0$). KAT-Coder-V2.5-Dev, which was post-trained with harness randomization
+\citep{huang2026katcoder}, shows the smallest spread of the three; \method{}
+aims to obtain the same property from the training data alone.
 
 \subsection{\method{} versus a step-matched control}
 \label{sec:step-matched}
@@ -807,26 +810,58 @@ data.
 \section{Related Work}
 \label{sec:related}
 
-\paragraph{SWE agents and their scaffolds.} \citet{jimenez2024swebench}
-established the benchmark; \citet{yang2024sweagent} showed that the
-agent--computer interface itself materially determines performance, which is the
-observation our work builds on and generalizes. OpenHands
-\citep{wang2025openhands} is the most widely used open scaffold; R2E-Gym
-\citep{jain2025r2egym} and SWE-smith \citep{yang2025swesmith} scale task and
-environment supply but leave the interface fixed. We
-are, to our knowledge, the first to treat the scaffold as a nuisance variable to
-be marginalized out during training.
+\paragraph{SWE agents, scaffolds and their training data.}
+\citet{jimenez2024swebench} established the benchmark, and
+\citet{yang2024sweagent} showed that the agent--computer interface itself
+materially determines performance. Scaffolds since then range from a pipeline
+or a bare shell \citep{xia2024agentless,minisweagent2025} to the rich tool sets
+of OpenHands \citep{wang2025openhands,wang2025openhandssdk} and of the
+production harnesses we study \citep{anthropic2025claudecode,openai2025codex,
+opencode2025}, and recent measurements confirm that the choice among them is a
+first-order factor: it moves scores by as much as the choice of model
+\citep{zhang2026stopcomparing,yao2026harnessbench,zheng2026clawswebench}, the
+two shares vary across benchmarks \citep{merrill2026terminalbench}, and
+single-run differences of a few points lie within evaluation noise
+\citep{bjarnason2026randomness}. On the training side, SWE-Gym
+\citep{pan2024swegym}, SWE-smith \citep{yang2025swesmith}, R2E-Gym
+\citep{jain2025r2egym}, SWE-rebench
+\citep{badertdinov2025swerebench,badertdinov2026swerebenchv2}, Skywork-SWE
+\citep{zeng2025skyworkswe} and Devstral \citep{rastogi2025devstral} scale tasks
+and trajectories within one scaffold, while a growing line of work trains
+across many: mixing real trajectories from several scaffolds
+\citep{abadji2026laguna}, randomizing synthetic tool sets or environments
+\citep{kimiteam2025k2,chen2026minimaxm2,cao2026qwen3codernext}, or randomizing
+the harness during reinforcement learning
+\citep{huang2026katcoder,xu2026polar,yu2026openforgerl}. Those works vary the
+scaffold at evaluation time or collect trajectories in every harness; we treat
+the scaffold as a nuisance variable at training time and synthesize its
+surfaces from one harness's trajectories, and Section~\ref{sec:real} compares
+the two directly.
 
-\paragraph{Invariance and domain generalization.} Domain randomization
-\citep{tobin2017domain} and invariant risk minimization \citep{arjovsky2019irm}
-pursue invariance by exposure and by penalty respectively; the bound of
-\citet{benda2010theory} formalizes why exposure to a distribution of domains
-helps. Our setting is unusually favourable to this family of methods: the
-content-preserving property that \citet{kugelgen2021self} must assume of an
-augmentation is here measured at \rtacc{}, and the transformations between surfaces are explicit and composable rather
-than latent \citep{higgins2018symmetry}. The algebraic reading of the protocol as a normal
-form, under which differences rather than points compose, follows the analysis
-of \citet{allen2019analogies}.
+\paragraph{Interface reliance, invariance and protocol representations.}
+\citet{gu2026interfaces} show with semantics-preserving renaming that
+trajectory SFT amplifies interface memorization over semantic understanding,
+\citet{may2026runtime} that agents internalize runtime conventions, and
+prompt-format sensitivity \citep{sclar2023sensitivity} and the loss of
+generalization under a frozen prompt template \citep{lin2025debunk} are the
+same phenomenon at the prompt level; diversity of tool settings
+\citep{he2025gentool} and function masking against name memorization
+\citep{lin2024hammer} are precursors of \chr{}'s naming tiers and
+anonymization. The remedy we adopt is domain randomization
+\citep{tobin2017domain} rather than a penalty as in invariant risk
+minimization \citep{arjovsky2019irm}, and the bound of \citet{benda2010theory}
+formalizes why exposure to a distribution of domains helps; our setting is
+unusually favourable to this family of methods, because the content-preserving
+property that \citet{kugelgen2021self} must assume of an augmentation is here
+measured at \rtacc{}, and the transformations between surfaces are explicit
+and composable rather than latent \citep{higgins2018symmetry}. The Agent Data
+Protocol \citep{song2025adp} also defines a scaffold-independent trajectory
+representation and compiles it into several scaffolds' SFT formats; our
+protocol differs in being recovered from production harnesses by
+normalization, in factoring the surface into axes that are sampled rather than
+compiled to fixed targets, and in an invertibility that is proved and
+measured, with the algebraic reading of the protocol as a normal form
+following \citet{allen2019analogies}.
 
 \section{Conclusion}
 
@@ -1494,7 +1529,7 @@ to read the tool documentation in front of it has nothing to fall back on.
 \label{app:e1-30b}
 
 Before the experiment of Section~\ref{sec:step-matched} we ran the same comparison at a
-smaller scale on Qwen3-30B-A3B-Instruct-2507 \citep{qwen3}, with a different
+smaller scale on Qwen3-30B-A3B-Instruct-2507 \citep{qwen3,qwen3_30b_card}, with a different
 recipe on both sides. The data were $5{,}000$ \claudecode{} trajectories;
 \chr{} rendered the $4{,}133$ of them that passed the filters of Section~\ref{sec:setup} into $M=2$ surfaces each, giving $8{,}266$ samples under
 $8{,}204$ distinct surface configurations with $11{,}205$ distinct tool names.
@@ -1559,8 +1594,10 @@ $\pm2.0$ on Verified and $\pm1.0$ on Multilingual, and do not interpret
 differences below them. The floor rests on one repeated pair and is a reading
 rule rather than a variance estimate.
 
-\paragraph{Harness releases.} The releases evaluated here differ from those of
-the parsed corpora (Table~\ref{tab:harnesses}) in a few tool names:
+\paragraph{Harness releases.} The releases evaluated here are \claudecode{}
+2.1.140, \codexcli{} 0.142.0, \opencode{} 1.17.15 and \openhands{} 1.40.1.
+They differ from those of the parsed corpora (Table~\ref{tab:harnesses}) in a
+few tool names:
 \codexcli{} exposes its shell as \texttt{shell} rather than
 \texttt{exec\_command}, and the \openhands{} build used for the earlier run
 (Appendix~\ref{app:e1-30b}) exposes \texttt{execute\_bash} and
