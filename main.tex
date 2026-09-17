@@ -781,40 +781,18 @@ has not; what remains for \method{} is a loss when every axis changes at once.
 \section{Limitations}
 \label{sec:limits}
 
-\paragraph{Strength of evidence.} Each cell of Table~\ref{tab:e1} averages
-three evaluations, but the two models are compared against a noise floor, and
-each model is a single training run. One of the ten cells favours the control
-beyond the noise floor.
-
-\paragraph{Name overlap with held-out harnesses.} \chr{}'s first
-naming tier harvests real tool names from the parsed harnesses and recombines
-them. Of the $\numsurfaces{}$ rendered samples, $33\%$ carry at least one
-\claudecode{} tool name (the source harness's), $33\%$ at least one
-\opencode{} name and $21\%$ at least one \codexcli{} name; none carries an
-\openhands{} name, because that harness's names are excluded from the pool, and
-none presents any of the three held-out harnesses as a coherent harness. \openhands{} is therefore
-the strictly zero-shot row of Table~\ref{tab:e1}; excluding each held-out
-harness's names in turn would make the others so.
-
-\paragraph{One base model, one source harness.} The main results use one
-base model; an earlier run on \oldmodel{}
-(Appendix~\ref{app:e1-30b}) agrees on Multilingual but not on Verified. All \method{} runs use \claudecode{} as the source harness. Whether the effect
-scales with model size, or holds when the source harness is \codexcli{}'s shell-only surface,
+Each experiment uses one base model and one source harness, and each
+fine-tuned model is a single training run compared against a noise floor
+rather than across repeated training. Because \chr{}'s first naming tier
+recombines real tool names, $33\%$ of the rendered samples carry a
+\claudecode{} name, $33\%$ an \opencode{} name and $21\%$ a \codexcli{} name,
+while none carries an \openhands{} name or presents any held-out harness as a
+coherent whole; the held-out harnesses are therefore unseen as interfaces, not
+as vocabularies. Training surfaces keep first-class file tools, so a shell-only
+surface such as \codexcli{}'s is never rendered into training data. Whether the
+effect scales with model size, holds for a shell-only source harness, or
+separates into the contributions of surface diversity and anonymization
 remains open.
-
-\paragraph{Ablations not run.} We have not separated sampling many surfaces
-from changing the surface once, which needs a control trained on one fixed
-rendering of the same trajectories, nor trained \chr{} without its anonymized
-tier, so the contribution of anonymization is not separated from that of
-rendering.
-
-\paragraph{Shell-only surfaces.} Every training surface keeps first-class
-file tools, in one of three granularities (split, unified editor, monolithic).
-A shell-only surface, which lowers \texttt{read\_file} and \texttt{search} into
-shell commands, exists in our renderer only as the text syntax family of
-Table~\ref{tab:roundtrip}, where the round trip is exact only up to $\simeq$;
-\codexcli{}'s surface is therefore parsed but never rendered into training
-data.
 
 \section{Related work}
 \label{sec:related}
