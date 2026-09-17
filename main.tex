@@ -14,6 +14,9 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{amsthm}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
 \usepackage{xcolor}
 
 % ---------------------------------------------------------------------------
@@ -29,6 +32,7 @@
 \newcommand{\cham}{\textsc{Chameleon}}
 % models
 \newcommand{\basemodel}{Qwen3.6-35B-A3B}
+\newcommand{\oldmodel}{Qwen3-30B-A3B-Instruct-2507}   % base model of the earlier run (Appendix C)
 % benchmarks
 \newcommand{\swev}{SWE-bench Verified}
 \newcommand{\swem}{SWE-bench Multilingual}
@@ -107,8 +111,7 @@ edits files, runs tests, and returns a patch, and SWE-bench
 \citep{jimenez2024swebench} has become the standard measure of how often that
 patch is correct. Underneath every such agent is a language model wrapped in a
 scaffold: a system prompt that documents a tool set, a protocol for emitting
-calls, an executor, and a formatter that returns observations. This wrapper,
-the \emph{harness}, is what the model actually sees.
+calls, an executor, and a formatter that returns observations. This wrapper, the \emph{harness} (also called a scaffold), is what the model actually sees.
 
 The four harnesses above all let an agent run shell commands and edit files,
 but they disagree on nearly every detail of how: whether reading a file is a
@@ -116,21 +119,21 @@ first-class tool or a shell command, whether that tool is called \texttt{Read}
 or \texttt{read} or \texttt{file\_editor} with
 \texttt{command="view"}, whether output carries line numbers, and whether an
 episode ends with a \texttt{finish} call or a plain reply. These are
-presentational choices, and one would like them not to matter. They do.
+presentational choices, and one would expect them not to matter, but they do.
 Evaluating an instruction-tuned model on a single task set and changing
 \emph{only} the harness (Table~\ref{tab:e0}), \swev{} accuracy moves by up to
 $9.0$ points, from $58.6\%$ to $67.6\%$ for Qwen3.5-35B-A3B across five
 harnesses, a spread produced by nothing but the wrapper.
 
 The gap has a simple origin. Agent training data is collected inside whichever
-harness the data pipeline uses, and supervised fine-tuning on that data teaches
+harness the data pipeline uses, and supervised fine-tuning (SFT) on that data teaches
 the task \emph{and} the surface at once, with no signal separating them. A tool
 named \texttt{Bash} that takes a \texttt{command} argument and returns
 untruncated output becomes as much a part of the learned policy as the decision
 to run the test suite before editing. Deployment in a different harness then
 presents a distribution shift that is, from the model's perspective,
 indistinguishable from a change of task (Figure~\ref{fig:overview}, left).
-The effect is measurable: fine-tuning Qwen3.6-35B-A3B on \claudecode{}
+The effect is measurable: fine-tuning \basemodel{} on \claudecode{}
 trajectories raises its \claudecode{} accuracy on \swev{} from $69.0\%$ to
 $78.4\%$ but moves its \codexcli{} accuracy by less than the noise floor
 ($68.0\%$ before, $66.7\%$ after), widening its spread across harnesses from $3.4$ to $11.7$
@@ -142,7 +145,7 @@ points (Section~\ref{sec:step-matched}).
 \end{center}
 \caption{\textbf{Left:} standard agent training binds the policy to the one
 harness its trajectories were collected in; moving the same model to a harness
-with different tools and conventions (\openhands{}, Codex) degrades
+with different tools and conventions (\openhands{}, \codexcli{}) degrades
 performance on the same tasks. \textbf{Right:} \method{} parses each real
 trajectory down to the \HP{}, the small semantic core all harnesses
 share, and re-renders it into many counterfactual harnesses whose tool
@@ -157,7 +160,7 @@ We argue that this shift is avoidable, because the disagreement between
 harnesses is superficial in a measurable sense. We parsed \numtraj{}
 trajectories ($557{,}732$ steps, \numactions{} tool calls) from four production
 harnesses whose declared tool counts range from $4$ to $21$, and normalized
-every call into a semantic action. Twelve actions suffice: after normalization
+every call into a semantic action. A vocabulary of $12$ actions suffices: after normalization
 only $0.04\%$ of calls fall outside the vocabulary (Table~\ref{tab:vocab}). The
 harnesses are not doing different things; they are naming and packaging the
 same things differently. We make this core explicit and call it the \HP{}. A
@@ -173,11 +176,11 @@ of them exact (Section~\ref{sec:protocol}). This is a \emph{descriptive} claim a
 harnesses that already exist, not a proposal for a new standard.
 
 Exact invertibility is what turns the protocol from an analysis tool into a
-training signal. If a real trajectory can be undressed into protocol form and
-re-dressed in an arbitrary surface, then a single collected episode represents an entire family of equivalent
+training signal. If a real trajectory can be parsed into protocol form and
+re-rendered in an arbitrary surface, then a single collected episode represents an entire family of equivalent
 episodes. We introduce \method{} (Harness-INvariant Training), which trains on
 that family
-(Figure~\ref{fig:overview}, right). Counterfactual Harness Rendering (\chr{})
+(Figure~\ref{fig:overview}, right). Counterfactual harness rendering (\chr{})
 re-renders every trajectory under freshly sampled surface configurations, and
 interface anonymization replaces tool names with meaningless identifiers on a
 fraction of samples, so that reading the documentation rather than recognizing
@@ -211,9 +214,9 @@ marginalize over. Our contributions are summarized as follows:
   architecture change (Section~\ref{sec:method}).
 \item \textbf{A step-matched evaluation.} Against a control trained on the
   same trajectories in their original harness for the same number of steps,
-  \method{} is ahead under all three unseen production harnesses on both
-  benchmarks and narrows the \swem{} range across five harnesses from $7.4$ to
-  $1.6$ points (Section~\ref{sec:step-matched}).
+  \method{} matches the control on the source harness, is ahead under all
+  three unseen production harnesses on both benchmarks, and narrows the
+  accuracy range across harnesses (Section~\ref{sec:step-matched}).
 \end{itemize}
 
 \section{The Harness Protocol}
@@ -231,8 +234,10 @@ observation with formatting removed, and $c_t$ the agent's reasoning text.
 
 \paragraph{Harnesses as renderings.} A harness $h$ is a rendering function $R_h$
 mapping a protocol trajectory to a surface trajectory: the concrete token
-sequence a model consumes and produces. Writing $\mathcal{H}$ for the space of
-harnesses, we factor the surface into five axes,
+sequence a model consumes and produces. We use \emph{surface} and
+\emph{interface} interchangeably for this rendering, and \emph{harness} for the
+whole system that also executes the actions. Writing $\mathcal{H}$ for the
+space of harnesses, we factor the surface into five axes,
 \begin{equation}
 \mathcal{H} \;=\; A_1 \times A_2 \times A_3 \times A_4 \times A_5 ,
 \label{eq:axes}
@@ -243,7 +248,8 @@ turn and completion conventions. A harness is a point $h \in \mathcal{H}$;
 sampling a point is sampling a synthetic harness (Appendix~\ref{app:orbit}
 illustrates one trajectory under three such points).
 
-\paragraph{Proposition 1 (round-trip exactness).} \emph{Under the premises
+\begin{proposition}[round-trip exactness]\label{prop:roundtrip}
+Under the premises
 (P1)--(P4) of Appendix~\ref{app:premises}, for every $h \in \mathcal{H}$
 realized by our renderer there is a parser $P_h$ with $P_h \circ R_h =
 \mathrm{id}$ on the action sequence of every protocol trajectory: exactly for
@@ -251,7 +257,9 @@ the three syntax families with named tools, and up to an operational
 equivalence $\simeq$ (a file read and the shell command that performs it; a
 final reply absorbed into the submission message) for the shell-only family
 and for the plain-reply completion convention of $A_5$. In particular $R_h$ is
-injective on actions, modulo $\simeq$.} Appendix~\ref{app:proof} proves this by
+injective on actions, modulo $\simeq$.
+\end{proposition}
+\noindent Appendix~\ref{app:proof} proves this by
 construction, one stage at a time: granularity and naming form an injective
 table lookup, and each syntax family is a decodable encoding of the named
 record, with a JSON escape encoding for the few values a family cannot carry.
@@ -280,7 +288,8 @@ $\tilde{\pi}\!\left(R_{h'}(x)\right) = \tilde{\pi}\!\left(R_{h}(x)\right)$, wher
 $\tilde\pi$ denotes the policy's output pushed back to protocol level. Deviation
 from this equality is what we measure; the natural distance between two
 harnesses is the number of axes on which they differ,
-$d(h,h') = \big|\{\, i : h_i \neq h'_i \,\}\big|$.
+$d(h,h') = \big|\{\, i : h_i \neq h'_i \,\}\big|$. We call a training method
+that pursues this property harness-invariant, whence \method{}'s name.
 
 \subsection{What the measurement shows}
 
@@ -288,7 +297,7 @@ $d(h,h') = \big|\{\, i : h_i \neq h'_i \,\}\big|$.
 \caption{The $12$-action vocabulary recovered by normalizing four harnesses,
 with its distribution over $\numactions{}$ real tool calls. \texttt{unknown} is not
 part of the vocabulary; it is the residual, and its size bounds the coverage
-error.}
+error. Percentages are rounded independently and need not sum to $100$.}
 \label{tab:vocab}
 \begin{center}
 \begin{small}
@@ -335,11 +344,12 @@ Harness & Tools & Granularity & Shell tool & File read \\
 \end{table}
 
 Table~\ref{tab:harnesses} makes the spread concrete, and the extremes are
-instructive. \openhands{} exposes four tools; \claudecode{} exposes twenty-one. \codexcli{} declares thirteen tools but \emph{none} of them reads, edits or searches
+instructive. \openhands{} exposes $4$ tools; \claudecode{} exposes $21$.
+\codexcli{} declares $13$ tools but \emph{none} of them reads, edits or searches
 files: $97\%$ of its calls go to a single \texttt{exec\_command} entry point,
 and of those command bodies $27\%$ are file reads (\texttt{sed -n},
 \texttt{cat}, \texttt{head}), $18\%$ are searches (\texttt{grep},
-\texttt{find}), and $10\%$ are patch applications. More than half of Codex's
+\texttt{find}), and $10\%$ are patch applications. More than half of \codexcli{}'s
 shell traffic is, semantically, what other harnesses expose as first-class
 tools. Surface variation of this magnitude over an identical semantic core is
 exactly the regime in which a surface-bound policy fails and an
@@ -373,7 +383,7 @@ Total               & $\numtraj{}$ & $\numactions{}$ & $1{,}866{,}373$ & $1{,}77
 \end{center}
 \end{table}
 
-\section{\method{}: Harness-Invariant Training}
+\section{\method{}: harness-invariant training}
 \label{sec:method}
 
 \begin{figure}[t]
@@ -392,13 +402,12 @@ under real harnesses that were never seen in training.}
 \label{fig:pipeline}
 \end{figure}
 
-\method{} has two components, Counterfactual Harness Rendering and interface
-anonymization, the second implemented as one tier of the first's name sampler;
+\method{} has two components, counterfactual harness rendering and interface anonymization, the second implemented as one tier of the first's name sampler;
 both touch only the data, and nothing about the model architecture or the
 training objective changes.
 Figure~\ref{fig:pipeline} traces the pipeline end to end.
 
-\subsection{L1: Counterfactual Harness Rendering}
+\subsection{Counterfactual harness rendering}
 
 Given a corpus of real trajectories collected in a single harness $h_0$, we
 parse each into protocol form and re-render it under $M$ configurations sampled
@@ -425,7 +434,7 @@ data therefore merges directly with ordinary agent SFT data and preserves the
 base model's tool-calling ability; the four text syntax families of
 Table~\ref{tab:roundtrip} serve the round-trip measurement, not training.
 
-\subsection{L2: Interface anonymization}
+\subsection{Interface anonymization}
 
 Sampling from real vocabularies alone leaves a shortcut intact: each semantic
 function has only a handful of attested names, so a model can still map
@@ -444,8 +453,7 @@ carrying the information needed to act.
 Real harnesses cannot be perturbed one axis at a time: there is no way to give
 \claudecode{} \openhands{}'s observation format while holding everything else fixed. We
 therefore implement \cham{}, an executable agent harness in which every surface
-property is a configuration parameter drawn from the same five axes. \cham{}
-really parses calls, really executes them against a workspace, and formats
+property is a configuration parameter drawn from the same five axes. \cham{} parses calls, executes them against a real workspace, and formats
 observations according to its configuration, which makes it both the instrument
 for single-axis controlled experiments and an environment for evaluation under
 arbitrary synthetic harnesses.
@@ -471,9 +479,9 @@ native function calling. \method{} trains on these rendered samples alone. Both 
 full-parameter fine-tuning with a global batch of $128$ packed sequences of up
 to $256$K tokens and learning rate $5\times10^{-5}$ with cosine decay.
 
-\paragraph{The control that matters.} Rendering multiplies the data: the
+\paragraph{Step-matched control.} Rendering multiplies the data: the
 rendered set holds about $1.7\times$ the tokens of the original trajectories,
-so a gain could be bought by extra optimization rather than by surface
+so a gain could come from extra optimization rather than from surface
 diversity. We therefore match optimizer steps. The \control{} trains on the
 original \claudecode{} trajectories for three epochs, which is $67$ steps;
 \method{} trains for the same $67$ steps, about $1.8$ passes over its rendered
@@ -487,7 +495,8 @@ the control sees each trajectory three times in its original surface, and
 \swev{} is a human-validated subset of SWE-bench \citep{jimenez2024swebench}:
 $500$ tasks from $12$ Python repositories. \swem{} \citep{yang2025swesmith}
 has $300$ tasks in nine other programming languages (C, C++, Go, Java,
-JavaScript, TypeScript, PHP, Ruby and Rust). In
+JavaScript, TypeScript, PHP, Ruby and Rust); we refer to the two as Verified
+and Multilingual. In
 Sections~\ref{sec:harness-choice} and~\ref{sec:step-matched}, every model
 runs under the four production harnesses of Table~\ref{tab:harnesses} and
 under \cham{} with one fixed configuration, and all models are served with
@@ -502,7 +511,7 @@ them as a coherent harness; Section~\ref{sec:limits} counts the rendered
 samples that carry one of their tool names. Appendix~\ref{app:eval} gives the run-to-run noise floor and summarizes the
 settings of every experiment in Table~\ref{tab:settings}.
 
-\subsection{Harness choice alone moves accuracy}
+\subsection{Harness choice alone}
 \label{sec:harness-choice}
 
 \begin{table}[t]
@@ -516,7 +525,7 @@ cell. Spread is max minus min over the five harnesses.}
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}l S[table-format=2.1, table-fixed-width=true, table-column-width=38pt] S[table-format=2.1, table-fixed-width=true, table-column-width=38pt] @{\hspace{12pt}} S[table-format=2.1, table-fixed-width=true, table-column-width=38pt] S[table-format=2.1, table-fixed-width=true, table-column-width=38pt] @{\hspace{12pt}} S[table-format=2.1, table-fixed-width=true, table-column-width=38pt] S[table-format=2.1, table-fixed-width=true, table-column-width=38pt]@{}}
 \toprule
- & \multicolumn{2}{c}{Qwen3.5-35B-A3B} & \multicolumn{2}{c}{Qwen3.6-35B-A3B} & \multicolumn{2}{c}{KAT-Coder-V2.5-Dev} \\
+ & \multicolumn{2}{c}{Qwen3.5-35B-A3B} & \multicolumn{2}{c}{\basemodel{}} & \multicolumn{2}{c}{KAT-Coder-V2.5-Dev} \\
 \cmidrule(r){2-3}\cmidrule(lr){4-5}\cmidrule(l){6-7}
 Harness & {V} & {M} & {V} & {M} & {V} & {M} \\
 \midrule
@@ -535,11 +544,11 @@ Spread        & 9.0  & 8.7  & 3.4  & 7.0  & 2.6  & 3.0  \\
 
 Table~\ref{tab:e0} establishes the phenomenon the method addresses. The ordering
 is not explained by tool count or interface simplicity: \codexcli{}, which
-declares thirteen tools but routes file operations through a shell, is the lowest
+declares $13$ tools but routes file operations through a shell, is the lowest
 of the four production harnesses on Verified for all three open-weight models,
-while \openhands{}, with four tools, is the best or second best harness for the
+while \openhands{}, with $4$ tools, is the best or second best harness for the
 two Qwen models. The size of the spread is a property of the model: $9.0$
-points for Qwen3.5-35B-A3B, $3.4$ for Qwen3.6-35B-A3B and $2.6$ for
+points for Qwen3.5-35B-A3B, $3.4$ for \basemodel{} and $2.6$ for
 KAT-Coder-V2.5-Dev on Verified, in the same order on Multilingual ($8.7$,
 $7.0$, $3.0$). KAT-Coder-V2.5-Dev, which was post-trained with harness randomization
 \citep{huang2026katcoder}, shows the smallest spread of the three; \method{}
@@ -596,13 +605,13 @@ Multilingual its five accuracies lie within $1.6$ points.}
 
 Table~\ref{tab:e1} and Figure~\ref{fig:e1} give the result. Both fine-tuned
 models improve on the base model on average, the control by $5.0$ points on
-Verified and $6.6$ on Multilingual, \method{} by $7.6$ and $10.3$. Where the
-control's gain lands is the problem of Section~\ref{sec:intro} in miniature.
+Verified and $6.6$ on Multilingual, \method{} by $7.6$ and $10.3$. Where the control's gain lands illustrates the problem of
+Section~\ref{sec:intro}.
 On Verified it gains $9.4$ points under \claudecode{}, the harness its data came
 from, $2.9$ under \opencode{}, and less than the noise floor under \codexcli{}
 ($68.0\%$ before fine-tuning, $66.7\%$ after), so its spread across harnesses grows from $3.4$
-to $11.7$ points. Fine-tuning on one harness bought accuracy on that harness
-and made the model more dependent on it.
+to $11.7$ points. Fine-tuning on one harness raised accuracy on that harness and made the model
+more dependent on it.
 
 On the source harness \method{} is level with the control on Verified
 ($78.6\%$ against $78.4\%$, within the noise floor) and ahead on Multilingual
@@ -634,7 +643,7 @@ there \method{}'s advantage appeared on Multilingual only.
 \begin{center}
 \includegraphics[width=\textwidth]{pic/real_harness_data.pdf}
 \end{center}
-\caption{\method{} versus a model trained on real trajectories from four harnesses, both fine-tuned from Qwen3-30B-A3B-Instruct-2507 for the same
+\caption{\method{} versus a model trained on real trajectories from four harnesses, both fine-tuned from \oldmodel{} for the same
 number of steps, under the four production harnesses and \cham{} (pass@1, one
 evaluation per cell). \textbf{(a)}~\swev{}. \textbf{(b)}~\swem{}.}
 \label{fig:real}
@@ -642,7 +651,7 @@ evaluation per cell). \textbf{(a)}~\swev{}. \textbf{(b)}~\swem{}.}
 
 A direct alternative to rendering counterfactual surfaces is to collect real
 trajectories in several harnesses, and we compare the two on
-Qwen3-30B-A3B-Instruct-2507, the base model of Appendix~\ref{app:e1-30b}. The \method{} model of that appendix trains on \claudecode{} trajectories
+\oldmodel{}, the base model of Appendix~\ref{app:e1-30b}. The \method{} model of that appendix trains on \claudecode{} trajectories
 mixed with their \chr{} renderings. The alternative trains on real
 trajectories collected in four harnesses, \claudecode{}, \opencode{},
 \openhands{} and \codexcli{}, with the same schedule and the same number of
@@ -670,7 +679,7 @@ points under the other two and under \cham{}, and higher on average. The two
 training sets also differ in their tasks, so the comparison is between two
 data pipelines rather than between surfaces alone.
 
-\subsection{Anonymizing the interface at test time}
+\subsection{Test-time anonymization of the interface}
 \label{sec:anon}
 
 \begin{figure}[t]
@@ -689,9 +698,9 @@ they cannot show which cue a model relies on. We isolate the cheapest cue, the i
 which let a model that recognizes \texttt{Bash} act without reading its
 description and which \chr{}'s anonymized tier is meant to make
 unnecessary. Holding the
-\cham{} configuration of Table~\ref{tab:e0} fixed (nine tools with seventeen
-parameters), we replace about half of the tool and parameter names (four and
-eight, respectively), and then all of them, with meaningless identifiers, so
+\cham{} configuration of Table~\ref{tab:e0} fixed ($9$ tools with $17$
+parameters), we replace about half of the tool and parameter names ($4$ and
+$8$, respectively), and then all of them, with meaningless identifiers, so
 that, for example, \texttt{run\_command} becomes \texttt{zete}. The tool
 descriptions are identical across settings and the system prompt names no
 tool, so what each tool does remains readable throughout. \basemodel{} before
@@ -714,7 +723,7 @@ is nonetheless in distribution: \method{}'s training data was anonymized with
 the same identifier generator, so the result shows that this behaviour was
 acquired, not that it extends to naming schemes unseen in training.
 
-\subsection{Moving one surface axis at a time}
+\subsection{One surface axis at a time}
 \label{sec:axes}
 
 \begin{figure}[t]
@@ -747,7 +756,7 @@ episode with a finish call. Two further surfaces change A1 and A5 together and
 all four axes. The call syntax (A2) is fixed by native function calling, and
 every surface exposes the same actions. We evaluate the \method{} model of
 Appendix~\ref{app:e1-30b} and a control fine-tuned from the same base model,
-Qwen3-30B-A3B-Instruct-2507, on the same \claudecode{} trajectories alone, once
+\oldmodel{}, on the same \claudecode{} trajectories alone, once
 per surface on \swem{}. These runs use a different evaluation environment from
 Appendix~\ref{app:e1-30b} and exclude the few episodes
 still running when a cell was closed (at most $15$ of $300$), so their absolute
@@ -777,7 +786,7 @@ three evaluations, but the two models are compared against a noise floor, and
 each model is a single training run. One of the ten cells favours the control
 beyond the noise floor.
 
-\paragraph{Unseen harnesses are not all unseen vocabularies.} \chr{}'s first
+\paragraph{Name overlap with held-out harnesses.} \chr{}'s first
 naming tier harvests real tool names from the parsed harnesses and recombines
 them. Of the $\numsurfaces{}$ rendered samples, $33\%$ carry at least one
 \claudecode{} tool name (the source harness's), $33\%$ at least one
@@ -787,8 +796,8 @@ none presents any of the three held-out harnesses as a coherent harness. \openha
 the strictly zero-shot row of Table~\ref{tab:e1}; excluding each held-out
 harness's names in turn would make the others so.
 
-\paragraph{One model family, one source harness.} The main results use one
-base model; an earlier run on Qwen3-30B-A3B-Instruct-2507
+\paragraph{One base model, one source harness.} The main results use one
+base model; an earlier run on \oldmodel{}
 (Appendix~\ref{app:e1-30b}) agrees on Multilingual but not on Verified. All \method{} runs use \claudecode{} as the source harness. Whether the effect
 scales with model size, or holds when the source harness is \codexcli{}'s shell-only surface,
 remains open.
@@ -807,7 +816,7 @@ Table~\ref{tab:roundtrip}, where the round trip is exact only up to $\simeq$;
 \codexcli{}'s surface is therefore parsed but never rendered into training
 data.
 
-\section{Related Work}
+\section{Related work}
 \label{sec:related}
 
 \paragraph{SWE agents, scaffolds and their training data.}
@@ -834,9 +843,9 @@ across many: mixing real trajectories from several scaffolds
 the harness during reinforcement learning
 \citep{huang2026katcoder,xu2026polar,yu2026openforgerl}. Those works vary the
 scaffold at evaluation time or collect trajectories in every harness; we treat
-the scaffold as a nuisance variable at training time and synthesize its
-surfaces from one harness's trajectories, and Section~\ref{sec:real} compares
-the two directly.
+the scaffold as a nuisance variable at training time and are, to our
+knowledge, the first to synthesize its surfaces by re-rendering one harness's
+real trajectories, and Section~\ref{sec:real} compares the two directly.
 
 \paragraph{Interface reliance, invariance and protocol representations.}
 \citet{gu2026interfaces} show with semantics-preserving renaming that
@@ -866,8 +875,8 @@ following \citet{allen2019analogies}.
 \section{Conclusion}
 
 Agent harnesses differ far more on the surface than in substance: four
-production harnesses, ranging from four tools to twenty-one and from
-first-class file editors to file access through a shell alone, reduce to twelve semantic
+production harnesses, ranging from $4$ tools to $21$ and from
+first-class file editors to file access through a shell alone, reduce to $12$ semantic
 actions covering $99.96\%$ of $\numactions{}$ real calls. Making that core explicit
 as the \HP{}, and verifying that the surface map is invertible on those calls,
 exactly in $95.2\%$ of \numroundtrip{} render--parse checks and up to an
@@ -995,10 +1004,12 @@ Section~\ref{app:premises}:
 \subsection{Lemma 1: the naming stage is an injective table lookup}
 \label{app:naming}
 
-\paragraph{Lemma 1.} \emph{Under (P1), (P2) and (P4), $N_h$ is injective and the
-inverse tables of the parser recover $(v,r)$ from $(n,\rho)$.}
-
-\emph{Proof.} Let $\tau:\mathcal{V}\to T_g$ assign each verb its surface tool.
+\begin{lemma}\label{lem:naming}
+Under (P1), (P2) and (P4), $N_h$ is injective and the
+inverse tables of the parser recover $(v,r)$ from $(n,\rho)$.
+\end{lemma}
+\begin{proof}
+Let $\tau:\mathcal{V}\to T_g$ assign each verb its surface tool.
 Under \textsc{split}, $\tau$ is a bijection and $N_h(v,r)=(N(\tau(v)),\
 r\circ\Pi^{-1})$. Under \textsc{unified}, the five file verbs share the editor
 tool, and $N_h$ adds to the renamed record one selector entry
@@ -1016,16 +1027,19 @@ the tool determines $v$ because $\tau$ is a bijection on the remaining verbs.
 (iii) It renames the data keys back through $\Pi^{-1}$, which is well defined
 on the tool's key set by (P2), and re-types the values by the declared type
 of each key, which returns the original values by (P4). Hence the decoder is a
-left inverse of $N_h$ and $N_h$ is injective. $\square$
+left inverse of $N_h$ and $N_h$ is injective.
+\end{proof}
 
 \subsection{Lemma 2: the named-tool syntax families are decodable encodings}
 \label{app:named}
 
-\paragraph{Lemma 2.} \emph{For $s\in\{\textsc{json},\textsc{xml},\textsc{yaml}\}$
+\begin{lemma}\label{lem:named}
+For $s\in\{\textup{\textsc{json}},\textup{\textsc{xml}},\textup{\textsc{yaml}}\}$
 and every named record $(n,\rho)$, $D_s(E_s(n,\rho))=(n,\rho)$; for
-\textsc{json} this uses (P3).}
-
-\emph{Proof.} Write $J$ for JSON serialization. $J$ is injective on finite
+\textup{\textsc{json}} this uses (P3).
+\end{lemma}
+\begin{proof}
+Write $J$ for JSON serialization. $J$ is injective on finite
 records with distinct string keys and values of the types above (every string
 becomes a quoted string in which quotes, backslashes and control characters
 are escaped), and $J^{-1}\circ J$ is the identity on them.
@@ -1065,7 +1079,8 @@ $D$ reads key lines at two spaces of indentation, collects the four-space lines
 of a block scalar while stripping the prefix, and drops trailing lines that are
 genuinely empty; the only such line is the one produced by the newline before
 the closing fence, since empty value lines were encoded as four spaces. Scalars
-on key lines are recovered by $J^{-1}$. $\square$
+on key lines are recovered by $J^{-1}$.
+\end{proof}
 
 \subsection{Lemma 3: the shell-only family is exact up to $\simeq$}
 \label{app:shell}
@@ -1090,11 +1105,13 @@ documented filler message; and an action with an argument the executor
 ignores (the display label of a delegation, the \texttt{view}/\texttt{plan}
 selector of a task-list update) with the same action without it.
 
-\paragraph{Lemma 3.} \emph{For every action $a$,
-$P_{\textsc{shell}}(E_{\textsc{shell}}(a))\simeq a$. Consequently
-$E_{\textsc{shell}}(a)=E_{\textsc{shell}}(a')$ implies $a\simeq a'$.}
-
-\emph{Proof.} We list the encoding and its decoding per verb.
+\begin{lemma}\label{lem:shell}
+For every action $a$,
+$P_{\textup{\textsc{shell}}}(E_{\textup{\textsc{shell}}}(a))\simeq a$. Consequently
+$E_{\textup{\textsc{shell}}}(a)=E_{\textup{\textsc{shell}}}(a')$ implies $a\simeq a'$.
+\end{lemma}
+\begin{proof}
+We list the encoding and its decoding per verb.
 \texttt{run\_shell}: the command in a fenced block tagged \texttt{bash}; a
 command containing a fence goes to $E_{\mathrm{esc}}$. The decoder takes the
 shortest span to the closing fence and strips outer newlines ($\simeq$).
@@ -1125,11 +1142,13 @@ plan block, keeps the earliest non-overlapping ones so that a fence quoted
 inside a patch body is not a second call, and reads block-free text as a
 submission. In every case the decoded action is the original or its
 $\simeq$-image, which proves the first claim; the second follows because
-$\simeq$-images are unique up to $\simeq$. $\square$
+$\simeq$-images are unique up to $\simeq$.
+\end{proof}
 
 \subsection{Proof of the proposition}
 \label{app:theorem}
 
+\begin{proof}[Proof of Proposition~\ref{prop:roundtrip}]
 For a configuration with a named-tool family, Lemmas~1 and~2 give
 $P_h\circ R_h = N_h^{-1}\circ D_s\circ E_s\circ N_h = N_h^{-1}\circ N_h =
 \mathrm{id}$ on $\mathcal{A}$. For the shell family, Lemma~3 gives
@@ -1142,7 +1161,8 @@ This is exact as long as the reasoning contains no block opener of the family,
 which the normalization of Section~\ref{sec:setup} guarantees by moving
 every call out of the text channels. Two turn conventions absorb the final
 reasoning into the submission message (the shell family, and the plain-reply
-completion convention of $A_5$); we count them under $\simeq$. $\square$
+completion convention of $A_5$); we count them under $\simeq$.
+\end{proof}
 
 Two remarks. First, the composition $T_{h\to h'}=R_{h'}\circ P_h$ is defined
 on the image of $R_h$, so it is a total map between surfaces, and
@@ -1216,7 +1236,7 @@ preserved and only the surface changes.}
 \label{fig:orbit}
 \end{figure}
 
-\section{What the trajectories show: a behavioural analysis}
+\section{Behavioural analysis of the evaluation trajectories}
 \label{app:analysis}
 
 Accuracy summarizes an episode in one bit. The trajectories behind this
@@ -1224,13 +1244,13 @@ paper's cross-harness evaluations carry more: every tool call, the observation
 it produced, the tokens each step consumed, and how the episode ended. This
 appendix reads them. Two collections are used. The first is a models $\times$
 harnesses evaluation: six instruction-tuned models (Claude Opus 5, GPT-5.6,
-DeepSeek-V4-Pro, GLM-5.2, Qwen3.6-35B-A3B, Qwen3.5-27B) run under the four
+DeepSeek-V4-Pro, GLM-5.2, \basemodel{}, Qwen3.5-27B) run under the four
 production harnesses and \cham{} (one fixed synthetic configuration) on the
 $500$ Verified and $300$ Multilingual tasks (Qwen3.5-27B on a $100+60$
 subset), $17{,}374$ completed episodes over $26$ model--harness cells, of which
 $17{,}230$ made at least one tool call and enter Table~\ref{tab:ana-summary};
 Figure~\ref{fig:ana-mix} marks the cells that could not be run. The second is
-the \method{} and control pair of the earlier Qwen3-30B-A3B-Instruct-2507 run
+the \method{} and control pair of the earlier \oldmodel{} run
 (Appendix~\ref{app:e1-30b}), on \claudecode{} (the source harness),
 \opencode{} and \openhands{}: $4{,}280$
 episodes. Every call is mapped to the protocol vocabulary with the parsers of
@@ -1258,7 +1278,7 @@ same row differs across panels.}
 \label{fig:ana-mix}
 \end{figure}
 
-\subsection{The semantic work is the same; the surface is not}
+\subsection{Semantic action composition}
 
 Figure~\ref{fig:ana-mix} gives, for each model and harness, the mix of
 semantic actions after normalization. The rows within a panel are strikingly
@@ -1298,7 +1318,7 @@ explicit finish ($26\%$ and $30\%$ of the calls in the closing $5\%$), and
 \codexcli{} opens with a search-dominated burst ($67\%$ of its opening
 calls). Below the conventions, the coarse action composition is the same.
 
-\subsection{What the harness does change: length and context}
+\subsection{Episode length and context cost}
 
 \begin{figure}[t]
 \begin{center}
@@ -1353,7 +1373,7 @@ cheapest. The two quantities can move in opposite directions: \cham{} takes
 the most calls but the fewest tokens per call, and its total episode cost is
 the lowest of all harnesses for four of the six models.
 
-\subsection{Interface dependence is a per-task phenomenon}
+\subsection{Task-level agreement across harnesses}
 
 \begin{figure}[t]
 \begin{center}
@@ -1378,7 +1398,7 @@ harness-dependent, solved under some harnesses and not others
 which tasks a model solves is only moderate, Cohen's $\kappa$ between $0.25$
 and $0.54$ (Figure~\ref{fig:ana-agree}b); \codexcli{} agrees least with the
 rest. Consequently an oracle that may pick the harness per task beats the best
-single harness by $2.1$ (GPT-5.6) to $11.9$ (Qwen3.6-35B-A3B) points
+single harness by $2.1$ (GPT-5.6) to $11.9$ (\basemodel{}) points
 (Figure~\ref{fig:ana-agree}c), and the gap widens as the model weakens. Part of
 this gap is the run-to-run variance a single harness would also show
 ($\pm2.0$ points, Appendix~\ref{app:eval}); the remainder is what the interface,
@@ -1387,7 +1407,7 @@ understates interface dependence, since accuracies can agree while the solved
 sets do not; and the oracle gap bounds what a policy that is indifferent to
 the interface could recover.
 
-\subsection{Friction follows the harness more than the model}
+\subsection{Interface errors}
 
 \begin{figure}[t]
 \begin{center}
@@ -1525,11 +1545,11 @@ the failure that \method{} is designed to remove, and the reason the
 anonymized tier of Section~\ref{sec:method} exists: a model that has learned
 to read the tool documentation in front of it has nothing to fall back on.
 
-\section{An earlier run on Qwen3-30B-A3B-Instruct-2507}
+\section{An earlier run on \oldmodel{}}
 \label{app:e1-30b}
 
 Before the experiment of Section~\ref{sec:step-matched} we ran the same comparison at a
-smaller scale on Qwen3-30B-A3B-Instruct-2507 \citep{qwen3,qwen3_30b_card}, with a different
+smaller scale on \oldmodel{} \citep{qwen3,qwen3_30b_card}, with a different
 recipe on both sides. The data were $5{,}000$ \claudecode{} trajectories;
 \chr{} rendered the $4{,}133$ of them that passed the filters of Section~\ref{sec:setup} into $M=2$ surfaces each, giving $8{,}266$ samples under
 $8{,}204$ distinct surface configurations with $11{,}205$ distinct tool names.
@@ -1625,10 +1645,10 @@ Where & Base model & Models compared & Harnesses & Bench. & Evals & Conditions \
 \midrule
 Section~\ref{sec:harness-choice}, Table~\ref{tab:e0} & Qwen3.5-35B-A3B, \basemodel{}, KAT-Coder-V2.5-Dev & not fine-tuned & four production, \cham{} & V, M & 1 & Section~\ref{sec:setup} stack \\
 Section~\ref{sec:step-matched}, Table~\ref{tab:e1} & \basemodel{} & \method{}, \control{} & four production, \cham{} & V, M & 3 & Section~\ref{sec:setup} stack \\
-Section~\ref{sec:real}, Figure~\ref{fig:real} & Qwen3-30B-A3B-Instruct-2507 & \method{} of Appendix~\ref{app:e1-30b}, real-trajectory model & four production, \cham{} & V, M & 1 & Appendix~\ref{app:e1-30b} conditions for \claudecode{} and \opencode{}, separate runs elsewhere \\
+Section~\ref{sec:real}, Figure~\ref{fig:real} & \oldmodel{} & \method{} of Appendix~\ref{app:e1-30b}, real-trajectory model & four production, \cham{} & V, M & 1 & Appendix~\ref{app:e1-30b} conditions for \claudecode{} and \opencode{}, separate runs elsewhere \\
 Section~\ref{sec:anon}, Figure~\ref{fig:anon} & \basemodel{} & base, \method{} of Table~\ref{tab:e1} & \cham{}, three naming settings & M & 1 & separate runs \\
-Section~\ref{sec:axes}, Figure~\ref{fig:axes} & Qwen3-30B-A3B-Instruct-2507 & \method{} of Appendix~\ref{app:e1-30b}, control & \cham{}, seven surfaces & M & 1 & separate runs; unfinished episodes excluded \\
-Appendix~\ref{app:e1-30b}, Table~\ref{tab:e1-30b} & Qwen3-30B-A3B-Instruct-2507 & \method{}, control & \claudecode{}, \opencode{} & V, M & 1 & Appendix~\ref{app:e1-30b} conditions \\
+Section~\ref{sec:axes}, Figure~\ref{fig:axes} & \oldmodel{} & \method{} of Appendix~\ref{app:e1-30b}, control & \cham{}, seven surfaces & M & 1 & separate runs; unfinished episodes excluded \\
+Appendix~\ref{app:e1-30b}, Table~\ref{tab:e1-30b} & \oldmodel{} & \method{}, control & \claudecode{}, \opencode{} & V, M & 1 & Appendix~\ref{app:e1-30b} conditions \\
 \bottomrule
 \end{tabular}
 \end{footnotesize}
