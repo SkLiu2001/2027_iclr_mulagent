@@ -841,6 +841,47 @@ unseen production harness, by up to $8.7$ points. Aligning hidden
 representations across renderings of the same decision point, which
 Proposition~1 makes well posed, is the natural next step.
 
+\subsection*{AI use statement}
+
+In this work, we used generative AI tools for editing and polishing the text
+of the manuscript, that is, for improving grammar, wording and readability of
+sentences that we wrote. We have not used generative AI tools for research
+ideation, for the design of the method or of the experiments, for writing the
+code of the renderer, the harness or the evaluation pipeline, or for producing
+or analysing the data and results reported here, and the remaining tasks with
+required disclosure are not applicable to this work. We have reviewed all
+AI-assisted text. We take responsibility for the final content of this work,
+including any text produced with the aid of generative AI.
+
+\subsection*{Ethics statement}
+
+This work trains and evaluates software-engineering agents on public GitHub
+repositories: the training tasks are SWE-rebench-V2 instances and the
+evaluation tasks are the public \swev{} and \swem{} sets. No human subjects,
+personal data or code beyond these public repositories are involved, and
+repository content is used under its own licenses. Trajectories are collected
+and evaluated in isolated sandboxes that cannot affect systems outside the task
+container. The method aims to make agents less sensitive to their interface, and
+we foresee no harm specific to it beyond those of coding agents in general.
+
+\subsection*{Reproducibility statement}
+
+Section~\ref{sec:protocol} and Appendix~\ref{app:proof} define the protocol,
+the renderer and the parser, state the premises (P1)--(P4) and prove
+Proposition~1; the round-trip check that verifies the implementation is
+described in Section~\ref{sec:protocol} and Table~\ref{tab:roundtrip}, with
+the $\simeq$ cases enumerated in Appendix~\ref{app:premises}.
+Section~\ref{sec:method} specifies the training-surface space
+$\mathcal{H}_{\mathrm{train}}$ and the three naming tiers, and
+Section~\ref{sec:setup} gives the task source, teacher, filters, sample
+counts, per-axis composition and training hyperparameters of both fine-tuning
+runs. Appendix~\ref{app:eval} lists every experiment's models, harnesses,
+evaluation counts and conditions (Table~\ref{tab:settings}), the leaked-fix
+scoring rule, the rounding rule, the noise floor and the harness releases
+evaluated. We plan to release the parsers, the renderer, the \cham{} harness,
+the surface sampler and the evaluation configurations, together with the
+rendered training samples, as supplementary material.
+
 \bibliography{hint}
 \bibliographystyle{iclr2027_conference}
 
