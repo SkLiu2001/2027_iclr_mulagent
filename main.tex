@@ -238,9 +238,8 @@ shows one trajectory under three such points).
 
 \begin{table}[b]
 \caption{The $12$-action vocabulary recovered by normalizing four harnesses,
-with its distribution over $\numactions{}$ real tool calls. \texttt{unknown} is not
-part of the vocabulary; it is the residual, and its size bounds the coverage
-error. Percentages are rounded independently and need not sum to $100$.}
+with its share of \numactions{} real tool calls; \texttt{unknown} is the
+residual outside the vocabulary. Percentages are rounded independently.}
 \label{tab:vocab}
 \begin{center}
 \begin{small}
@@ -264,11 +263,10 @@ Action & Share & Action & Share \\
 
 \begin{table}[t]
 \caption{Four production harnesses agree on semantics and disagree on
-everything else. ``Tools'' counts the standard declared schema; granularity is
-the $A_1$ setting each harness occupies, where shell only means that files are
-read, searched and edited through shell commands rather than first-class tools.
-Tool names are those of the releases in our parsed corpora; the releases
-evaluated in Section~\ref{sec:exp} rename a few of them (Appendix~\ref{app:eval}).}
+everything else. ``Tools'' counts the declared schema; granularity is the
+$A_1$ setting, where shell only means that files are read, searched and edited
+through shell commands. Tool names are those of the parsed releases; the
+evaluated releases rename a few of them (Appendix~\ref{app:eval}).}
 \label{tab:harnesses}
 \begin{center}
 \begin{small}
@@ -332,12 +330,11 @@ acts as a normal form.
 
 \begin{table}[t]
 \caption{Round-trip exactness. Every action of each corpus is rendered under
-randomly sampled surface configurations (four per action for the mixed set,
-three for the other two corpora) and parsed back. A check is exact when the
-verb and all arguments match, and $\simeq$ when they match up to the
-operational equivalence of Proposition~\ref{prop:roundtrip}, which arises only
-in the shell family; consistency, exact plus $\simeq$, is \rtacc{} in every
-row. The $232$ calls outside the vocabulary are not rendered.}
+sampled surface configurations (four per action for the mixed set, three
+otherwise) and parsed back; exact means that the verb and all arguments
+match, $\simeq$ equality up to the operational equivalence of
+Proposition~\ref{prop:roundtrip}, which arises only in the shell family. The
+$232$ calls outside the vocabulary are not rendered.}
 \label{tab:roundtrip}
 \begin{center}
 \begin{small}
@@ -383,8 +380,13 @@ two components, counterfactual harness rendering and interface anonymization,
 the second implemented as one tier of the first's name sampler; both touch
 only the data, and nothing about the model architecture or the training
 objective changes. Figure~\ref{fig:pipeline} traces the pipeline end to end.
-\cham{}, the configurable harness we use to evaluate under synthetic surfaces,
-is described with the experimental setup (Section~\ref{sec:setup}).
+Because real harnesses cannot be perturbed one axis at a time, we also
+implement \cham{}, an executable harness in which every surface property is a
+configuration parameter drawn from the five axes of Eq.~(\ref{eq:axes}); it
+parses calls, executes them against a real workspace and formats observations
+according to its configuration, and serves as the instrument for single-axis
+experiments (Section~\ref{sec:axes}) and as an evaluation environment under
+synthetic surfaces.
 
 \subsection{Counterfactual harness rendering}
 \label{sec:chr}
@@ -456,16 +458,6 @@ with sequence packing, equal steps at an equal batch size are also
 approximately equal training tokens. The two runs differ only in their data:
 the control sees each trajectory three times in its original surface,
 \method{} in three different surfaces, none of which is \claudecode{}'s own.
-
-\paragraph{\cham{}.} Real harnesses cannot be perturbed one axis at a time:
-there is no way to give \claudecode{} \openhands{}'s observation format while
-holding everything else fixed. We therefore implement \cham{}, an executable
-agent harness in which every surface property is a configuration parameter
-drawn from the five axes of Eq.~(\ref{eq:axes}). It parses calls, executes
-them against a real workspace, and formats observations according to its
-configuration, which makes it both the instrument for single-axis controlled
-experiments (Section~\ref{sec:axes}) and an environment for evaluation under
-arbitrary synthetic harnesses.
 
 \paragraph{Evaluation.} We report pass@1 on \swev{}
 \citep{jimenez2024swebench}, $500$ human-validated tasks from $12$ Python
@@ -581,7 +573,7 @@ Multilingual only.
 
 \begin{figure}[t]
 \begin{center}
-\includegraphics[width=\textwidth]{pic/real_harness_data.pdf}
+\includegraphics[width=0.85\textwidth]{pic/real_harness_data.pdf}
 \end{center}
 \caption{\method{} versus a model trained on real trajectories from four harnesses, both fine-tuned from \oldmodel{} for the same
 number of steps, under the four production harnesses and \cham{} (pass@1, one
@@ -616,7 +608,7 @@ alone.
 
 \begin{figure}[t]
 \begin{center}
-\includegraphics[width=\textwidth]{pic/anon_names.pdf}
+\includegraphics[width=0.8\textwidth]{pic/anon_names.pdf}
 \end{center}
 \caption{Anonymizing tool and parameter names under \cham{} on \swem{}, for
 \basemodel{} before fine-tuning and the \method{} model of
@@ -630,29 +622,26 @@ they cannot show which cue a model relies on. We isolate the cheapest cue, the i
 which let a model that recognizes \texttt{Bash} act without reading its
 description and which \chr{}'s anonymized tier is meant to make
 unnecessary. Holding the
-\cham{} configuration of Table~\ref{tab:e0} fixed ($9$ tools with $17$
-parameters), we replace about half of the tool and parameter names ($4$ and
-$8$, respectively), and then all of them, with meaningless identifiers, so
-that, for example, \texttt{run\_command} becomes \texttt{zete}. The tool
+\cham{} configuration of Table~\ref{tab:e0} fixed ($9$ tools, $17$
+parameters), we replace about half of the names, then all of them, with
+meaningless identifiers (\texttt{run\_command} becomes \texttt{zete}). The tool
 descriptions are identical across settings and the system prompt names no
 tool, so what each tool does remains readable throughout. \basemodel{} before
 fine-tuning and the \method{} model of Section~\ref{sec:step-matched} are
-each evaluated once per setting on \swem{} and compared only with their own
-run under the original names, so only differences between settings are
-interpreted. As Figure~\ref{fig:anon} shows, \method{}'s
+evaluated once per setting on \swem{}, each compared with its own run under
+the original names. As Figure~\ref{fig:anon} shows, \method{}'s
 accuracy is unchanged ($74.3\%$, $74.6\%$ and $74.3\%$), and with all names
 replaced it newly fails exactly as many tasks as it newly solves ($22$ each).
 The base model falls from $68.0\%$ to $67.3\%$ and $64.0\%$, losing $29$ tasks
 and gaining $17$, and its additional failures coincide with the new identifiers: calls to tools
 that do not exist rise from $5$ to $27$ of the $300$ tasks, and the calls
 misspell the new identifiers (\texttt{kazu\_op} for
-\texttt{kozu\_op}) rather than revert to the original ones. On this interface, then, \method{}'s accuracy does not depend on recognizable
-identifiers, which is the behaviour the anonymized tier is meant to teach; the
-$22$ tasks that flip in each direction show that individual episodes still
-change. The test
-is nonetheless in distribution: \method{}'s training data was anonymized with
-the same identifier generator, so the result shows that this behaviour was
-acquired, not that it extends to naming schemes unseen in training.
+\texttt{kozu\_op}) rather than revert to the original ones. \method{}'s accuracy thus does not depend on recognizable identifiers, the
+behaviour the anonymized tier is meant to teach, although the $22$ flips in
+each direction show that individual episodes still change. The test is in
+distribution, since training used the same identifier generator, so it shows
+that the behaviour was acquired, not that it extends to unseen naming
+schemes.
 
 \subsection{One surface axis at a time}
 \label{sec:axes}
@@ -674,29 +663,25 @@ each at $d=0$, $2$ and $4$); open markers are the four single-axis surfaces.}
 Production harnesses differ on several surface axes at once, so
 Section~\ref{sec:step-matched} cannot say which axis a model is bound to, and
 Section~\ref{sec:anon} isolates only one cue; \cham{} can move the axes one at
-a time. We start from an origin configuration that mimics \claudecode{} and
-move each of A1, A3, A4 and A5 in turn to a pre-selected far setting: a
-monolithic tool with anonymized names for A1, a different persona and tabular
-documentation for A3, unnumbered, fenced and truncated observations for A4,
-and observations as user turns with a finish call for A5
-(Appendix~\ref{app:eval} lists the settings); two further surfaces change A1
-and A5 together and all four axes. The call syntax (A2) is fixed by native
+a time. From an origin configuration that mimics \claudecode{}, we move each of A1,
+A3, A4 and A5 in turn to a far setting (a monolithic tool with anonymized
+names, a different persona with tabular documentation, unnumbered fenced
+observations, and observations as user turns; Appendix~\ref{app:eval}), and
+two further surfaces change A1 and A5 together and all four axes. The call syntax (A2) is fixed by native
 function calling, and every surface exposes the same actions. We evaluate the
-\method{} model of Appendix~\ref{app:e1-30b} and a control fine-tuned from the
-same base model, \oldmodel{}, on the same \claudecode{} trajectories alone,
-once per surface on \swem{}; these runs use a different evaluation environment
-from Appendix~\ref{app:e1-30b}, so only differences between surfaces are
-interpreted. The control is bound to A1 (Figure~\ref{fig:axes}a): changing
+\method{} model of Appendix~\ref{app:e1-30b} and a control fine-tuned from
+\oldmodel{} on the same \claudecode{} trajectories alone, once per surface on
+\swem{}, in a different evaluation environment from that appendix, so only
+differences between surfaces are interpreted. The control is bound to A1 (Figure~\ref{fig:axes}a): changing
 naming and granularity alone takes it from $15.1\%$ on the origin to $3.3\%$,
 and it stays there whenever A1 is changed, whereas changing A3, A4 or A5 alone
 costs it at most $2.9$ points. \method{} is not: with A1 changed alone it
 scores $28.3\%$ against $24.0\%$ on the origin, and it is ahead of the control
 on every surface, by $8.9$ points on the origin and by up to $29.9$
 (Figure~\ref{fig:axes}b); only the surface that changes all four axes brings
-it down, to $17.0\%$. A model trained on one harness has thus absorbed that
-harness's tool vocabulary and granularity as part of the task, which
-\method{} has not; what remains for \method{} is a loss when every axis
-changes at once.
+it down, to $17.0\%$. A model trained on one harness has thus absorbed its tool vocabulary and
+granularity as part of the task; \method{} has not, and loses only when every
+axis changes at once.
 
 \section{Related work}
 \label{sec:related}
