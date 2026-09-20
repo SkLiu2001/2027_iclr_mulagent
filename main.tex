@@ -121,59 +121,45 @@ or \texttt{read} or \texttt{file\_editor} with
 \texttt{command="view"}, whether output carries line numbers, and whether an
 episode ends with a \texttt{finish} call or a plain reply. These are
 presentational choices, and one would expect them not to matter, but they do.
-Evaluating an instruction-tuned model on a single task set and changing
-\emph{only} the harness (Table~\ref{tab:e0}), \swev{} accuracy moves by up to
-$9.0$ points, from $58.6\%$ to $67.6\%$ for Qwen3.5-35B-A3B across five
-harnesses, a spread produced by nothing but the wrapper.
-
-The gap has a simple origin. Agent training data is collected inside whichever
-harness the data pipeline uses, and supervised fine-tuning (SFT) on that data teaches
-the task \emph{and} the surface at once, with no signal separating them. A tool
-named \texttt{Bash} that takes a \texttt{command} argument and returns
-untruncated output becomes as much a part of the learned policy as the decision
-to run the test suite before editing. Deployment in a different harness then
-presents a distribution shift that is, from the model's perspective,
-indistinguishable from a change of task (Figure~\ref{fig:overview}, left).
-The effect is measurable: fine-tuning \basemodel{} on \claudecode{}
-trajectories raises its \claudecode{} accuracy on \swev{} from $69.0\%$ to
-$78.4\%$ but moves its \codexcli{} accuracy by less than the noise floor
-($68.0\%$ before, $66.7\%$ after), widening its spread across harnesses from $3.4$ to $11.7$
-points (Section~\ref{sec:step-matched}).
+Changing \emph{only} the harness for a fixed instruction-tuned model and task
+set (Table~\ref{tab:e0}) moves \swev{} accuracy by up to $9.0$ points, from $58.6\%$ to $67.6\%$ for Qwen3.5-35B-A3B across five
+harnesses. Training makes the dependence worse: trajectories are collected in
+whichever harness the data pipeline uses, and supervised fine-tuning (SFT) on
+them teaches the task \emph{and} the surface at once, so a different harness at deployment is,
+from the model's perspective, a change of task (Figure~\ref{fig:overview},
+left). Fine-tuning \basemodel{} on \claudecode{} trajectories raises its
+\claudecode{} accuracy on \swev{} from $69.0\%$ to $78.4\%$ but moves its
+\codexcli{} accuracy by less than the noise floor ($68.0\%$ before, $66.7\%$
+after), widening its spread across harnesses from $3.4$ to $11.7$ points
+(Section~\ref{sec:step-matched}).
 
 \begin{figure}[t]
 \begin{center}
 \includegraphics[width=\textwidth]{pic/intro_v1.pdf}
 \end{center}
 \caption{\textbf{Left:} standard agent training binds the policy to the one
-harness its trajectories were collected in; moving the same model to a harness
-with different tools and conventions (\openhands{}, \codexcli{}) degrades
-performance on the same tasks. \textbf{Right:} \method{} parses each real
-trajectory down to the \HP{}, the small semantic core all harnesses
-share, and re-renders it into many counterfactual harnesses whose tool
-granularity and naming, prompt and tool documentation, observation formatting,
-and turn conventions are independently resampled, with the call syntax fixed by
-native function calling, training an agent that is invariant to the surface
-rather than bound to it.}
+harness its trajectories were collected in, and moving the model to a harness
+with different tools and conventions degrades performance on the same tasks.
+\textbf{Right:} \method{} parses each real trajectory down to the \HP{}, the
+semantic core all harnesses share, and re-renders it into many counterfactual
+harnesses whose surface axes are independently resampled, training an agent
+that is invariant to the surface rather than bound to it.}
 \label{fig:overview}
 \end{figure}
 
 We argue that this shift is avoidable, because the disagreement between
-harnesses is superficial in a measurable sense. We parsed \numtraj{}
-trajectories ($557{,}732$ steps, \numactions{} tool calls) from four production
-harnesses whose declared tool counts range from $4$ to $21$, and normalized
-every call into a semantic action. A vocabulary of $12$ actions suffices: after normalization
-only $0.04\%$ of calls fall outside the vocabulary (Table~\ref{tab:vocab}). The
-harnesses are not doing different things; they are naming and packaging the
+harnesses is superficial in a measurable sense. Normalizing \numactions{} tool
+calls from the four harnesses into semantic actions, we find that a
+vocabulary of $12$ covers $99.96\%$ of them (Table~\ref{tab:vocab}): the
+harnesses are not doing different things, they are naming and packaging the
 same things differently. We make this core explicit and call it the \HP{}. A
-concrete harness is then the protocol plus a choice of \emph{surface}, and the
-surface decomposes into five axes that can be set independently: tool
-granularity and naming, call syntax, prompt documentation, observation
-formatting, and turn conventions. The abstraction is not lossy: rendering a
-protocol trajectory into a surface and parsing it back recovers the original
-action sequence, exactly for surfaces with named tools and up to an operational
-equivalence for shell-only ones, measured at \rtacc{} consistency in
-\numroundtrip{} render--parse checks over all \numactions{} actions, $95.2\%$
-of them exact (Section~\ref{sec:protocol}). This is a \emph{descriptive} claim about
+concrete harness is then the protocol plus a \emph{surface}, five axes that
+can be set independently: tool granularity and naming, call syntax, prompt
+documentation, observation formatting, and turn conventions. The abstraction
+is not lossy: rendering a protocol trajectory into a surface and parsing it
+back recovers the original actions, with no mismatches in \numroundtrip{}
+render--parse checks over all \numactions{} actions
+(Section~\ref{sec:protocol}). This is a \emph{descriptive} claim about
 harnesses that already exist, not a proposal for a new standard.
 
 Exact invertibility is what turns the protocol from an analysis tool into a
@@ -191,33 +177,27 @@ and no architectural change.
 We fine-tune \basemodel{} on \claudecode{} trajectories and evaluate under real
 harnesses that training never showed as coherent wholes, against a \control{}
 trained on the same trajectories in their original harness for the same number
-of optimizer steps. On the source harness \method{} matches the control on Verified and is ahead
-on Multilingual. Under each of the three unseen production harnesses it is ahead on
-both benchmarks, by up to $8.7$ points; its worst harness scores $75.4\%$ on
-\swev{} against the control's $66.7\%$, and on \swem{} its accuracy varies by
-$1.6$ points across five harnesses against the control's $7.4$. Together, these
-results reframe harness variation: it is not a property of the task that a
-model must absorb, but a nuisance factor that a training pipeline can
-marginalize over. Our contributions are summarized as follows:
+of optimizer steps. \method{} matches the control on the source harness, is
+ahead on both benchmarks under each of the three unseen production harnesses,
+by up to $8.7$ points, and on \swem{} its accuracy varies by $1.6$ points
+across five harnesses against the control's $7.4$
+(Section~\ref{sec:step-matched}). Harness variation, in other words, is not a
+property of the task that a model must absorb, but a nuisance factor that a
+training pipeline can marginalize over. Our contributions are:
 \begin{itemize}
-\item \textbf{A measurement.} Harness choice alone moves \swev{} by up to
-  $9.0$ points for a fixed model and task set; the harness that does worst
-  is not the one with the fewest tools, the size of the spread is a
-  property of the model, and fine-tuning on one harness widens it
-  (Sections~\ref{sec:harness-choice} and~\ref{sec:step-matched}).
-\item \textbf{The \HP{}, with an exactness guarantee that is measured rather
-  than assumed.} A $12$-action vocabulary covers $99.96\%$ of \numactions{} real
-  calls from four harnesses; surface rendering is invertible on those calls,
-  verified in \numroundtrip{} render--parse checks with no mismatches, $95.2\%$
-  exact and $4.8\%$ operationally equivalent (Section~\ref{sec:protocol}).
-\item \textbf{\method{}}, a training method that multiplies existing
-  trajectories along the surface axes, needing no new task data and no
-  architecture change (Section~\ref{sec:method}).
-\item \textbf{A step-matched evaluation.} Against a control trained on the
-  same trajectories in their original harness for the same number of steps,
-  \method{} matches the control on the source harness, is ahead under all
-  three unseen production harnesses on both benchmarks, and narrows the
-  accuracy range across harnesses (Section~\ref{sec:step-matched}).
+\item \textbf{The \HP{}}: harness choice alone moves \swev{} by up to
+  $9.0$ points for a fixed model and task set, yet \numactions{} real tool
+  calls from four harnesses reduce to a $12$-action vocabulary with
+  invertible surface rendering, which we formalize as the protocol
+  (Sections~\ref{sec:protocol} and~\ref{sec:harness-choice}).
+\item \textbf{\method{}}: training on counterfactual renderings of existing
+  trajectories, with no new task data and no architecture change
+  (Section~\ref{sec:method}).
+\item \textbf{Experiments}: a step-matched evaluation under five harnesses
+  (Section~\ref{sec:step-matched}), a comparison with real trajectories from
+  four harnesses (Section~\ref{sec:real}), and analyses of test-time
+  anonymization and of one surface axis at a time (Sections~\ref{sec:anon}
+  and~\ref{sec:axes}).
 \end{itemize}
 
 \section{The Harness Protocol}
