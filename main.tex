@@ -203,12 +203,19 @@ training pipeline can marginalize over. Our contributions are:
 \section{The Harness Protocol}
 \label{sec:protocol}
 
-\subsection{Definitions}
+\subsection{Semantic actions and surfaces}
+
+Reading a file is a \texttt{Read} call in \claudecode{}, a \texttt{read} call
+in \opencode{}, a \texttt{file\_editor} call with \texttt{command="view"} in
+\openhands{}, and a \texttt{sed -n} or \texttt{cat} command under \codexcli{};
+the protocol records all four as the same action, \texttt{read\_file}, and
+treats everything else about the call as a property of the harness.
 
 \paragraph{Semantic actions.} Let $\mathcal{A}$ be a finite vocabulary of
 semantic actions, each a pair of a verb and a typed argument record. We take
 $\mathcal{A}$ to be the $12$ actions of Table~\ref{tab:vocab}, obtained by
-normalizing four harnesses' tool sets rather than by design. A \emph{protocol
+normalizing four harnesses' tool sets rather than by design; only $0.04\%$ of
+the \numactions{} real calls we parsed fall outside it. A \emph{protocol
 trajectory} is a sequence $\tau = \big[(c_t, a_t, o_t)\big]_{t=1}^{T}$ where
 $a_t \in \mathcal{A}$ is an action, $o_t$ the semantic content of the resulting
 observation with formatting removed, and $c_t$ the agent's reasoning text.
@@ -227,54 +234,9 @@ with $A_1$ tool granularity and naming, $A_2$ call syntax, $A_3$ system-prompt
 template and tool-documentation style, $A_4$ observation formatting, and $A_5$
 turn and completion conventions. A harness is a point $h \in \mathcal{H}$;
 sampling a point is sampling a synthetic harness (Appendix~\ref{app:orbit}
-illustrates one trajectory under three such points).
+shows one trajectory under three such points).
 
-\begin{proposition}[round-trip exactness]\label{prop:roundtrip}
-Under the premises
-(P1)--(P4) of Appendix~\ref{app:premises}, for every $h \in \mathcal{H}$
-realized by our renderer there is a parser $P_h$ with $P_h \circ R_h =
-\mathrm{id}$ on the action sequence of every protocol trajectory: exactly for
-the three syntax families with named tools, and up to an operational
-equivalence $\simeq$ (a file read and the shell command that performs it; a
-final reply absorbed into the submission message) for the shell-only family
-and for the plain-reply completion convention of $A_5$. In particular $R_h$ is
-injective on actions, modulo $\simeq$.
-\end{proposition}
-\noindent Appendix~\ref{app:proof} proves this by
-construction, one stage at a time: granularity and naming form an injective
-table lookup, and each syntax family is a decodable encoding of the named
-record, with a JSON escape encoding for the few values a family cannot carry.
-The proof covers the design; Table~\ref{tab:roundtrip} checks that the
-implementation meets the proof's premises on real data. We take every action
-of the \numtraj{} parsed trajectories (\numactions{} calls; the $232$ calls
-outside the vocabulary have no protocol form and are excluded), render each
-under three or four independently sampled configurations spanning all four
-call-syntax families, and parse the result back, comparing the action verb and
-every argument: \numroundtrip{} render--parse checks in all. Agreement is
-\rtacc{} with zero mismatches: $1{,}776{,}443$ checks ($95.2\%$) are exact, and
-$89{,}930$ ($4.8\%$), all in the shell family, agree up to $\simeq$ and are
-never counted as exact. Two consequences follow. First, the composition
-$T_{h \to h'} = R_{h'} \circ P_h$ is a well-defined, semantics-preserving
-translation between any two harnesses, exact on actions when $h'$ has named
-tools and exact up to $\simeq$ otherwise, so the protocol acts as a normal form. Second, the identifiability assumption behind
-augmentation-based representation learning, namely that the augmentation
-leaves \emph{content} untouched and perturbs only \emph{style}
-\citep{kugelgen2021self}, holds here by construction and by measurement, rather
-than approximately as it does for image augmentation.
-
-\paragraph{Interface invariance.} A policy $\pi$ is \emph{interface-invariant}
-if its induced semantic behaviour is unchanged by surface transport: for all
-$h, h'$ and all protocol states $x$,
-$\tilde{\pi}\!\left(R_{h'}(x)\right) = \tilde{\pi}\!\left(R_{h}(x)\right)$, where
-$\tilde\pi$ denotes the policy's output pushed back to protocol level. Deviation
-from this equality is what we measure; the natural distance between two
-harnesses is the number of axes on which they differ,
-$d(h,h') = \big|\{\, i : h_i \neq h'_i \,\}\big|$. We call a training method
-that pursues this property harness-invariant, whence \method{}'s name.
-
-\subsection{What the measurement shows}
-
-\begin{table}[t]
+\begin{table}[b]
 \caption{The $12$-action vocabulary recovered by normalizing four harnesses,
 with its distribution over $\numactions{}$ real tool calls. \texttt{unknown} is not
 part of the vocabulary; it is the residual, and its size bounds the coverage
@@ -324,8 +286,8 @@ Harness & Tools & Granularity & Shell tool & File read \\
 \end{center}
 \end{table}
 
-Table~\ref{tab:harnesses} makes the spread concrete, and the extremes are
-instructive. \openhands{} exposes $4$ tools; \claudecode{} exposes $21$.
+Table~\ref{tab:harnesses} places the four production harnesses in this space,
+and the extremes are instructive. \openhands{} exposes $4$ tools; \claudecode{} exposes $21$.
 \codexcli{} declares $13$ tools but \emph{none} of them reads, edits or searches
 files: $97\%$ of its calls go to a single \texttt{exec\_command} entry point,
 and of those command bodies $27\%$ are file reads (\texttt{sed -n},
@@ -336,15 +298,46 @@ tools. Surface variation of this magnitude over an identical semantic core is
 exactly the regime in which a surface-bound policy fails and an
 interface-invariant one should not.
 
+\subsection{Round-trip exactness}
+
+Our renderer realizes the call syntax $A_2$ either as native function calling,
+the structured format production harnesses deploy and the one used for
+training (Section~\ref{sec:chr}), or as one of four text families used for the
+measurement below: \textsc{json}, \textsc{xml} and \textsc{yaml} blocks with
+named tools, and a shell-only family in which file operations are lowered to
+shell commands.
+
+\begin{proposition}[round-trip exactness]\label{prop:roundtrip}
+Under the premises
+(P1)--(P4) of Appendix~\ref{app:premises}, for every $h \in \mathcal{H}$
+realized by our renderer there is a parser $P_h$ with $P_h \circ R_h =
+\mathrm{id}$ on the action sequence of every protocol trajectory: exactly for
+the three syntax families with named tools, and up to an operational
+equivalence $\simeq$ (a file read and the shell command that performs it; a
+final reply absorbed into the submission message) for the shell-only family
+and for the plain-reply completion convention of $A_5$. In particular $R_h$ is
+injective on actions, modulo $\simeq$.
+\end{proposition}
+\noindent Appendix~\ref{app:proof} proves this by construction, one stage at a
+time: granularity and naming form an injective table lookup, and each syntax
+family is a decodable encoding of the named record. The proof covers the
+design; Table~\ref{tab:roundtrip} checks that the implementation meets its
+premises on real data, rendering every action of the \numtraj{} parsed
+trajectories under three or four sampled configurations and parsing the result
+back: \numroundtrip{} checks with zero mismatches, $95.2\%$ of them exact and
+the remaining $4.8\%$, all in the shell family, equal up to $\simeq$. The
+composition $T_{h \to h'} = R_{h'} \circ P_h$ is therefore a
+semantics-preserving translation between any two harnesses, and the protocol
+acts as a normal form.
+
 \begin{table}[t]
 \caption{Round-trip exactness. Every action of each corpus is rendered under
-randomly sampled surface configurations, four per action for the mixed set and
-three for the other two corpora, and parsed back. A check is exact when the
+randomly sampled surface configurations (four per action for the mixed set,
+three for the other two corpora) and parsed back. A check is exact when the
 verb and all arguments match, and $\simeq$ when they match up to the
-operational equivalence of Proposition~1, which arises only in the shell
-family; consistency, exact plus $\simeq$ over checks, is \rtacc{} in every row.
-The $232$ calls outside the vocabulary (Table~\ref{tab:vocab}) have no protocol
-form and are not rendered.}
+operational equivalence of Proposition~\ref{prop:roundtrip}, which arises only
+in the shell family; consistency, exact plus $\simeq$, is \rtacc{} in every
+row. The $232$ calls outside the vocabulary are not rendered.}
 \label{tab:roundtrip}
 \begin{center}
 \begin{small}
@@ -369,26 +362,32 @@ Total               & $\numtraj{}$ & $\numactions{}$ & $1{,}866{,}373$ & $1{,}77
 
 \begin{figure}[t]
 \begin{center}
-\includegraphics[width=\textwidth]{pic/main_v1.pdf}
+\includegraphics[width=0.85\textwidth]{pic/main_v1.pdf}
 \end{center}
-\caption{The \method{} pipeline. (1)~Collect verified trajectories with a
-teacher agent in a single real harness. (2)~Parse each trajectory down to the
-\HP{}: a sequence of thought, semantic action, and observation, with all
-surface formatting stripped and recorded. (3)~Re-render every protocol
-trajectory under freshly sampled surface configurations (real, synthetic, and
-anonymized vocabularies), producing counterfactual harnesses that never existed
-but are semantically faithful to the original episode. (4)~Filter, sample to a
-token budget, and fine-tune. (5)~Evaluate the resulting model on SWE-bench
-under real harnesses that were never seen in training.}
+\caption{The \method{} pipeline: trajectories collected with a teacher agent
+in one real harness are parsed down to the \HP{}, re-rendered under freshly
+sampled surface configurations with real, synthetic or anonymized tool
+vocabularies, filtered and sampled to a token budget, and used for
+fine-tuning; the model is then evaluated under real harnesses never seen in
+training.}
 \label{fig:pipeline}
 \end{figure}
 
-\method{} has two components, counterfactual harness rendering and interface anonymization, the second implemented as one tier of the first's name sampler;
-both touch only the data, and nothing about the model architecture or the
-training objective changes.
-Figure~\ref{fig:pipeline} traces the pipeline end to end.
+A policy $\pi$ is \emph{interface-invariant} if its induced semantic behaviour
+is unchanged by surface transport: for all $h, h'$ and all protocol states $x$,
+$\tilde{\pi}\!\left(R_{h'}(x)\right) = \tilde{\pi}\!\left(R_{h}(x)\right)$, where
+$\tilde\pi$ denotes the policy's output pushed back to protocol level.
+Deviation from this equality is what Section~\ref{sec:exp} measures, and
+\method{} is a training method that pursues it, whence its name. \method{} has
+two components, counterfactual harness rendering and interface anonymization,
+the second implemented as one tier of the first's name sampler; both touch
+only the data, and nothing about the model architecture or the training
+objective changes. Figure~\ref{fig:pipeline} traces the pipeline end to end.
+\cham{}, the configurable harness we use to evaluate under synthetic surfaces,
+is described with the experimental setup (Section~\ref{sec:setup}).
 
 \subsection{Counterfactual harness rendering}
+\label{sec:chr}
 
 Given a corpus of real trajectories collected in a single harness $h_0$, we
 parse each into protocol form and re-render it under $M$ configurations sampled
@@ -399,21 +398,21 @@ independently from $\mathcal{H}$:
 \tau \in \mathcal{D}_{\text{real}},\;
 h \sim \mathrm{Unif}(\mathcal{H}_{\mathrm{train}})^{M} \,\Big\},
 \end{equation}
-where $\mathcal{H}_{\mathrm{train}} \subset \mathcal{H}$ fixes the call syntax
-$A_2$ to native function calling and samples the four remaining axes. The
-semantic content of every sample is identical to a real, verified episode; only
-the surface is synthetic. This is domain randomization
+where $\mathcal{H}_{\mathrm{train}} \subset \mathcal{H}$ samples four axes and
+fixes the call syntax $A_2$ to native function calling, so that every rendered
+sample carries the \texttt{tools} schema and structured \texttt{tool\_calls}
+production harnesses deploy and merges directly with ordinary agent SFT data.
+The semantic content of every sample is identical to a real, verified episode;
+only the surface is synthetic. This is domain randomization
 \citep{tobin2017domain} applied to the agent interface rather than to visual
-appearance, and the domain-generalization bound of \citet{benda2010theory} motivates it:
-the bound charges the divergence between training and deployment domains,
-which training over a distribution of surfaces is meant to reduce.
-
-Rendered samples are emitted in the native function-calling format that
-production harnesses deploy: a top-level \texttt{tools} JSON schema, structured
-\texttt{tool\_calls}, and \texttt{tool\_call\_id}-linked tool messages. \chr{}
-data therefore merges directly with ordinary agent SFT data and preserves the
-base model's tool-calling ability; the four text syntax families of
-Table~\ref{tab:roundtrip} serve the round-trip measurement, not training.
+appearance, and two results motivate it. The domain-generalization bound of
+\citet{benda2010theory} charges the divergence between training and deployment
+domains, which training over a distribution of surfaces is meant to reduce.
+And the identifiability assumption behind augmentation-based representation
+learning, that the augmentation leaves \emph{content} untouched and perturbs
+only \emph{style} \citep{kugelgen2021self}, holds here by construction and by
+measurement (Proposition~\ref{prop:roundtrip}) rather than approximately as it
+does for image augmentation.
 
 \subsection{Interface anonymization}
 
@@ -428,16 +427,6 @@ anonymization component: a sample drawn into it has every tool name replaced.
 Canonical semantics are never anonymized: they remain in the tool
 documentation, so under the third tier the documentation is the only channel
 carrying the information needed to act.
-
-\subsection{\cham{}: a harness whose surface is a configuration}
-
-Real harnesses cannot be perturbed one axis at a time: there is no way to give
-\claudecode{} \openhands{}'s observation format while holding everything else fixed. We
-therefore implement \cham{}, an executable agent harness in which every surface
-property is a configuration parameter drawn from the same five axes. \cham{} parses calls, executes them against a real workspace, and formats
-observations according to its configuration, which makes it both the instrument
-for single-axis controlled experiments and an environment for evaluation under
-arbitrary synthetic harnesses.
 
 \section{Experiments}
 \label{sec:exp}
@@ -471,6 +460,16 @@ approximately equal training tokens. The two runs differ only in their data:
 the control sees each trajectory three times in its original surface, and
 \method{} sees it in three different surfaces, none of which is
 \claudecode{}'s own.
+
+\paragraph{\cham{}.} Real harnesses cannot be perturbed one axis at a time:
+there is no way to give \claudecode{} \openhands{}'s observation format while
+holding everything else fixed. We therefore implement \cham{}, an executable
+agent harness in which every surface property is a configuration parameter
+drawn from the five axes of Eq.~(\ref{eq:axes}). It parses calls, executes
+them against a real workspace, and formats observations according to its
+configuration, which makes it both the instrument for single-axis controlled
+experiments (Section~\ref{sec:axes}) and an environment for evaluation under
+arbitrary synthetic harnesses.
 
 \paragraph{Evaluation.} We evaluate on two benchmarks and report pass@1.
 \swev{} is a human-validated subset of SWE-bench \citep{jimenez2024swebench}:
