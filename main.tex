@@ -73,30 +73,31 @@ Affiliation \\
 \maketitle
 
 \begin{abstract}
-Large language models (LLMs) are increasingly deployed as software-engineering
-(SWE) agents that resolve real repository issues through multi-turn tool use.
-These agents interact with repositories
-through a \emph{harness} that defines their tools, call syntax, and
-observations. As a result, an agent trained in one harness can overfit to its
-interface and degrade when deployed in another: holding the model and tasks
-fixed, changing only the harness shifts \swev{} accuracy by up to $9.0$ points.
-We find that this variation is largely superficial. Across four production
-harnesses, diverse tool interfaces reduce to a shared set of only $12$ semantic
-actions. We formalize this common action space as the \HP{} and develop
-semantics-preserving transformations between the protocol and concrete
-harness interfaces, verified in \numroundtrip{} render--parse checks over
-\numactions{} real actions: no mismatches, with $95.2\%$ of checks exact and the
-rest equal up to an operational equivalence. Building on this representation, we introduce \method{}
-(Harness-INvariant Training), which re-renders each training trajectory under
-counterfactual harness interfaces and anonymizes interface-specific cues,
-encouraging the model to learn action semantics rather than memorize tool
-conventions. Against a control fine-tuned on the same trajectories in their
-original harness for the same number of steps, \method{} matches the control
-on that harness, is ahead under every unseen production harness by up to $8.7$
-points,
-and narrows the \swem{} accuracy range across five harnesses from $7.4$ to
-$1.6$ points. These results suggest that harness variation need not be a
-fundamental source of distribution shift for SWE agents.
+Large language model (LLM) agents now resolve real GitHub issues by exploring
+a repository, editing files and running tests. Each runs inside a
+\emph{harness} such as \claudecode{}, \codexcli{}, \opencode{} or
+\openhands{}, the scaffold that fixes which tools the model sees, their
+names, and how calls and results are formatted. These details differ across
+harnesses and they matter: with model and tasks fixed, changing only the
+harness moves \swev{} accuracy by up to $9.0$ points. Because training
+trajectories come from one harness, fine-tuning learns the interface with the
+task, and its gains largely stay there. This dependence is avoidable because
+the differences are superficial: \numactions{} real tool calls from four
+production harnesses all reduce to $12$ semantic actions, which we call the
+\HP{}. A harness is this protocol plus a \emph{surface} of tool names,
+documentation, output and turn formatting, and a trajectory rendered into any
+surface parses back to the same actions (\numroundtrip{} checks, no
+mismatches). \method{} (Harness-INvariant Training) parses each real
+trajectory into the protocol and re-renders it under many sampled surfaces,
+some with tool names replaced by meaningless identifiers, so that one
+harness's data trains an agent for any harness with no new task data.
+Fine-tuning \basemodel{} on \claudecode{} trajectories, \method{} matches a
+step-matched control on \claudecode{} itself, leads under every unseen
+harness by up to $8.7$ points, narrows the \swem{} accuracy range across five
+harnesses from $7.4$ to $1.6$ points, and is on a par with a model trained on
+real trajectories from four harnesses. Harness variation is thus a nuisance
+factor that training can marginalize over, not a distribution shift the agent
+must absorb.
 \end{abstract}
 
 \section{Introduction}
