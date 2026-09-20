@@ -89,13 +89,14 @@ documentation, output and turn formatting, and a trajectory rendered into any
 surface parses back to the same actions (\numroundtrip{} checks, no
 mismatches). \method{} (Harness-INvariant Training) parses each real
 trajectory into the protocol and re-renders it under many sampled surfaces,
-some with tool names replaced by meaningless identifiers, so that one
-harness's data trains an agent for any harness with no new task data.
+some
+with meaningless tool names, so that one harness's data trains an agent
+for any harness with no new task data.
 Fine-tuning \basemodel{} on \claudecode{} trajectories, \method{} matches a
 step-matched control on \claudecode{} itself, leads under every unseen
 production harness by up to $8.7$ points, narrows the \swem{} accuracy range across five
-harnesses from $7.4$ to $1.6$ points, and is on a par with a model trained on
-real trajectories from four harnesses. Harness variation is thus a nuisance
+harnesses from $7.4$ to $1.6$ points, and is on a par with training
+on real trajectories from four harnesses. Harness variation is thus a nuisance
 factor that training can marginalize over, not a distribution shift the agent
 must absorb.
 \end{abstract}
@@ -137,13 +138,13 @@ after), widening its spread across harnesses from $3.4$ to $11.7$ points
 \begin{center}
 \includegraphics[width=\textwidth]{pic/intro_v1.pdf}
 \end{center}
-\caption{\textbf{Left:} standard agent training binds the policy to the one
-harness its trajectories were collected in, and moving the model to a harness
+\caption{\textbf{Left:} standard training binds the policy to the harness its
+trajectories were collected in, and moving the model to a harness
 with different tools and conventions degrades performance on the same tasks.
 \textbf{Right:} \method{} parses each real trajectory down to the \HP{}, the
-semantic core all harnesses share, and re-renders it into many counterfactual
+core all harnesses share, and re-renders it into many counterfactual
 harnesses whose surface axes are independently resampled, training an agent
-that is invariant to the surface rather than bound to it.}
+invariant to the surface rather than bound to it.}
 \label{fig:overview}
 \end{figure}
 
@@ -205,17 +206,16 @@ training pipeline can marginalize over. Our contributions are:
 
 \subsection{Semantic actions and surfaces}
 
-Reading a file is a \texttt{Read} call in \claudecode{}, a \texttt{read} call
-in \opencode{}, a \texttt{file\_editor} call with \texttt{command="view"} in
-\openhands{}, and a \texttt{sed -n} or \texttt{cat} command under \codexcli{};
-the protocol records all four as the same action, \texttt{read\_file}, and
-treats everything else about the call as a property of the harness.
+Reading a file is a \texttt{Read} call in \claudecode{}, \texttt{read} in
+\opencode{}, \texttt{file\_editor} with \texttt{command="view"} in
+\openhands{}, and \texttt{sed -n} or \texttt{cat} under \codexcli{}; the
+protocol records all four as one action, \texttt{read\_file}, and treats the rest as a property of the harness.
 
 \paragraph{Semantic actions.} Let $\mathcal{A}$ be a finite vocabulary of
-semantic actions, each a pair of a verb and a typed argument record. We take
+semantic actions, each a verb with a typed argument record. We take
 $\mathcal{A}$ to be the $12$ actions of Table~\ref{tab:vocab}, obtained by
 normalizing four harnesses' tool sets rather than by design; only $0.04\%$ of
-the \numactions{} real calls we parsed fall outside it. A \emph{protocol
+\numactions{} real calls fall outside it. A \emph{protocol
 trajectory} is a sequence $\tau = \big[(c_t, a_t, o_t)\big]_{t=1}^{T}$ where
 $a_t \in \mathcal{A}$ is an action, $o_t$ the semantic content of the resulting
 observation with formatting removed, and $c_t$ the agent's reasoning text.
@@ -237,8 +237,8 @@ sampling a point is sampling a synthetic harness (Appendix~\ref{app:orbit}
 shows one trajectory under three such points).
 
 \begin{table}[b]
-\caption{The $12$-action vocabulary recovered by normalizing four harnesses,
-with its share of \numactions{} real tool calls; \texttt{unknown} is the
+\caption{The $12$-action vocabulary from normalizing four harnesses, with its
+share of \numactions{} real calls; \texttt{unknown} is the
 residual outside the vocabulary. Percentages are rounded independently.}
 \label{tab:vocab}
 \begin{center}
@@ -284,16 +284,16 @@ Harness & Tools & Granularity & Shell tool & File read \\
 \end{center}
 \end{table}
 
-Table~\ref{tab:harnesses} places the four production harnesses in this space,
-and the extremes are instructive. \openhands{} exposes $4$ tools; \claudecode{} exposes $21$.
+Table~\ref{tab:harnesses} places the four production harnesses in this space;
+the extremes are instructive. \openhands{} exposes $4$ tools; \claudecode{} exposes $21$.
 \codexcli{} declares $13$ tools but \emph{none} of them reads, edits or searches
 files: $97\%$ of its calls go to a single \texttt{exec\_command} entry point,
-and of those command bodies $27\%$ are file reads (\texttt{sed -n},
-\texttt{cat}, \texttt{head}), $18\%$ are searches (\texttt{grep},
-\texttt{find}), and $10\%$ are patch applications. More than half of \codexcli{}'s
+and of those commands $27\%$ are file reads (\texttt{sed -n}, \texttt{cat},
+\texttt{head}), $18\%$ searches (\texttt{grep}, \texttt{find}) and $10\%$
+patch applications. More than half of \codexcli{}'s
 shell traffic is, semantically, what other harnesses expose as first-class
-tools. Surface variation of this magnitude over an identical semantic core is
-exactly the regime in which a surface-bound policy fails and an
+tools. Surface variation of this magnitude over an identical semantic core is the
+regime in which a surface-bound policy fails and an
 interface-invariant one should not.
 
 \subsection{Round-trip exactness}
@@ -374,17 +374,16 @@ A policy $\pi$ is \emph{interface-invariant} if its induced semantic behaviour
 is unchanged by surface transport: for all $h, h'$ and all protocol states $x$,
 $\tilde{\pi}\!\left(R_{h'}(x)\right) = \tilde{\pi}\!\left(R_{h}(x)\right)$, where
 $\tilde\pi$ denotes the policy's output pushed back to protocol level.
-Deviation from this equality is what Section~\ref{sec:exp} measures, and
-\method{} is a training method that pursues it, whence its name. \method{} has
+Section~\ref{sec:exp} measures deviation from this equality, and \method{} is
+a training method that pursues it, whence its name. \method{} has
 two components, counterfactual harness rendering and interface anonymization,
 the second implemented as one tier of the first's name sampler; both touch
-only the data, and nothing about the model architecture or the training
-objective changes. Figure~\ref{fig:pipeline} traces the pipeline end to end.
+only the data; the model architecture and training objective are unchanged. Figure~\ref{fig:pipeline} traces the pipeline end to end.
 Because real harnesses cannot be perturbed one axis at a time, we also
 implement \cham{}, an executable harness in which every surface property is a
 configuration parameter drawn from the five axes of Eq.~(\ref{eq:axes}); it
-parses calls, executes them against a real workspace and formats observations
-according to its configuration, and serves as the instrument for single-axis
+parses calls, executes them in a real workspace and formats observations
+according to its configuration, serving as the instrument for single-axis
 experiments (Section~\ref{sec:axes}) and as an evaluation environment under
 synthetic surfaces.
 
@@ -437,27 +436,26 @@ carrying the information needed to act.
 \label{sec:setup}
 \paragraph{Model and data.} We fine-tune \basemodel{} \citep{qwen36card} on
 $9{,}366$ \claudecode{} trajectories collected with GLM-5.3 \citep{glm53card}
-as the teacher on SWE-rebench-V2 instances \citep{badertdinov2026swerebenchv2},
-one per task instance and deduplicated against both evaluation benchmarks.
+as teacher on SWE-rebench-V2 instances \citep{badertdinov2026swerebenchv2},
+one per instance, deduplicated against both evaluation benchmarks.
 After dropping trajectories with unmapped tools or fewer than three semantic
 actions, $8{,}677$ remain; \chr{} renders each into $M=3$ counterfactual
 surfaces, yielding \numsurfaces{} samples with $21{,}476$ distinct tool names,
 $30\%$ of them anonymized, all in native function calling
-(Appendix~\ref{app:eval} gives the surface statistics). \method{} trains on
+(surface statistics in Appendix~\ref{app:eval}). \method{} trains on
 these rendered samples alone. Both runs are full-parameter fine-tuning with a
-global batch of $128$ packed sequences of up to $256$K tokens and learning
-rate $5\times10^{-5}$ with cosine decay.
+global batch of $128$ packed sequences of up to $256$K tokens, learning rate
+$5\times10^{-5}$ and cosine decay.
 
 \paragraph{Step-matched control.} Rendering multiplies the data: the
-rendered set holds about $1.7\times$ the tokens of the original trajectories,
-so a gain could come from extra optimization rather than from surface
-diversity. We therefore match optimizer steps: the \control{} trains on the
+rendered set holds about $1.7\times$ the original tokens, so a gain could come
+from extra optimization rather than surface diversity. We therefore match optimizer steps: the \control{} trains on the
 original \claudecode{} trajectories for three epochs, $67$ steps, and
 \method{} for the same $67$ steps, about $1.8$ passes over its rendered set;
-with sequence packing, equal steps at an equal batch size are also
+with sequence packing, equal steps at equal batch size are also
 approximately equal training tokens. The two runs differ only in their data:
 the control sees each trajectory three times in its original surface,
-\method{} in three different surfaces, none of which is \claudecode{}'s own.
+\method{} in three different surfaces, none of them \claudecode{}'s own.
 
 \paragraph{Evaluation.} We report pass@1 on \swev{}
 \citep{jimenez2024swebench}, $500$ human-validated tasks from $12$ Python
@@ -481,9 +479,9 @@ Table~\ref{tab:settings}.
 
 \begin{table}[t]
 \caption{Harness choice alone moves accuracy. Pass@1 (\%) of three open-weight
-models on \swev{} (V, $500$ tasks) and \swem{} (M, $300$ tasks) under the four
-production harnesses and \cham{} (one fixed configuration), one evaluation per
-cell. Spread is max minus min over the five harnesses.}
+models on \swev{} (V, $500$ tasks) and \swem{} (M, $300$ tasks) under four
+production harnesses and \cham{} (fixed configuration), one evaluation per cell. Spread:
+max minus min.}
 \label{tab:e0}
 \begin{center}
 \begin{small}
@@ -510,14 +508,14 @@ Spread        & 9.0  & 8.7  & 3.4  & 7.0  & 2.6  & 3.0  \\
 Table~\ref{tab:e0} establishes the phenomenon the method addresses. The ordering
 is not explained by tool count or interface simplicity: \codexcli{}, which
 declares $13$ tools but routes file operations through a shell, is the lowest
-of the four production harnesses on Verified for all three open-weight models,
-while \openhands{}, with $4$ tools, is the best or second best harness for the
-two Qwen models. The size of the spread is a property of the model: $9.0$
+of the four production harnesses on Verified for all three models, while
+\openhands{}, with $4$ tools, is the best or second best for the two Qwen
+models. The size of the spread is a property of the model: $9.0$
 points for Qwen3.5-35B-A3B, $3.4$ for \basemodel{} and $2.6$ for
 KAT-Coder-V2.5-Dev on Verified, in the same order on Multilingual ($8.7$,
-$7.0$, $3.0$). KAT-Coder-V2.5-Dev, which was post-trained with harness randomization
-\citep{huang2026katcoder}, shows the smallest spread of the three; \method{}
-aims to obtain the same property from the training data alone.
+$7.0$, $3.0$). KAT-Coder-V2.5-Dev, post-trained with harness randomization
+\citep{huang2026katcoder}, shows the smallest spread; \method{} aims to obtain
+the same property from training data alone.
 
 \subsection{\method{} versus a step-matched control}
 \label{sec:step-matched}
@@ -575,8 +573,9 @@ Multilingual only.
 \begin{center}
 \includegraphics[width=0.85\textwidth]{pic/real_harness_data.pdf}
 \end{center}
-\caption{\method{} versus a model trained on real trajectories from four harnesses, both fine-tuned from \oldmodel{} for the same
-number of steps, under the four production harnesses and \cham{} (pass@1, one
+\caption{\method{} versus training on real trajectories from four harnesses,
+both fine-tuned from \oldmodel{} for equal steps,
+under the four production harnesses and \cham{} (pass@1, one
 evaluation per cell). \textbf{(a)}~\swev{}. \textbf{(b)}~\swem{}.}
 \label{fig:real}
 \end{figure}
@@ -612,8 +611,8 @@ alone.
 \end{center}
 \caption{Anonymizing tool and parameter names under \cham{} on \swem{}, for
 \basemodel{} before fine-tuning and the \method{} model of
-Section~\ref{sec:step-matched}, one evaluation per setting. \textbf{(a)}~Pass@1 as more names are replaced.
-\textbf{(b)}~Tasks whose outcome flips when all names are replaced.}
+Section~\ref{sec:step-matched}, one evaluation per setting. \textbf{(a)}~Pass@1 as names are replaced. \textbf{(b)}~Tasks that flip with
+all names replaced.}
 \label{fig:anon}
 \end{figure}
 
