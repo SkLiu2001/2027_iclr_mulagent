@@ -479,7 +479,7 @@ KAT-Coder-V2.5-Dev \citep{huang2026katcoder} once per cell,
 Section~\ref{sec:step-matched} averages three evaluations per cell, and the
 later experiments state their own conditions. We call \opencode{},
 \openhands{} and \codexcli{} unseen because training never presented any of
-them as a coherent harness (Section~\ref{sec:limits} counts the rendered
+them as a coherent harness (Appendix~\ref{sec:limits} counts the rendered
 samples that carry one of their tool names). Appendix~\ref{app:eval} gives the
 run-to-run noise floor and summarizes the settings of every experiment in
 Table~\ref{tab:settings}.
@@ -559,7 +559,7 @@ it never trained on \claudecode{}'s own surface. Under the three unseen
 production harnesses it is ahead on both benchmarks, by $2.8$, $4.5$ and $8.7$
 points on Verified and by $1.5$, $2.3$ and $7.4$ on Multilingual; the largest
 gap is under \codexcli{}, whose shell-only surface lies outside the surfaces
-\chr{} renders for training (Section~\ref{sec:limits}). The advantage is
+\chr{} renders for training (Appendix~\ref{sec:limits}). The advantage is
 therefore largest where the control is weakest: \method{}'s worst harness is
 $8.7$ points (Verified) and $7.4$ points (Multilingual) above the control's,
 and on Multilingual its five accuracies lie within $1.6$ points
@@ -698,22 +698,6 @@ harness's tool vocabulary and granularity as part of the task, which
 \method{} has not; what remains for \method{} is a loss when every axis
 changes at once.
 
-\section{Limitations}
-\label{sec:limits}
-
-Each experiment uses one base model and one source harness, and each
-fine-tuned model is a single training run compared against a noise floor
-rather than across repeated training. Because \chr{}'s first naming tier
-recombines real tool names, $33\%$ of the rendered samples carry a
-\claudecode{} name, $33\%$ an \opencode{} name and $21\%$ a \codexcli{} name,
-while none carries an \openhands{} name or presents any held-out harness as a
-coherent whole; the held-out harnesses are therefore unseen as interfaces, not
-as vocabularies. Training surfaces keep first-class file tools, so a shell-only
-surface such as \codexcli{}'s is never rendered into training data. Whether the
-effect scales with model size, holds for a shell-only source harness, or
-separates into the contributions of surface diversity and anonymization
-remains open.
-
 \section{Related work}
 \label{sec:related}
 
@@ -785,6 +769,7 @@ that control's harness, and is ahead of it under every
 unseen production harness, by up to $8.7$ points. Aligning hidden
 representations across renderings of the same decision point, which
 Proposition~1 makes well posed, is the natural next step.
+Appendix~\ref{sec:limits} discusses the limitations of this study.
 
 \subsection*{AI use statement}
 
@@ -1608,5 +1593,21 @@ Appendix~\ref{app:e1-30b}, Table~\ref{tab:e1-30b} & \oldmodel{} & \method{}, con
 \end{footnotesize}
 \end{center}
 \end{table}
+
+\section{Limitations}
+\label{sec:limits}
+
+Each experiment uses one base model and one source harness, and each
+fine-tuned model is a single training run compared against a noise floor
+rather than across repeated training. Because \chr{}'s first naming tier
+recombines real tool names, $33\%$ of the rendered samples carry a
+\claudecode{} name, $33\%$ an \opencode{} name and $21\%$ a \codexcli{} name,
+while none carries an \openhands{} name or presents any held-out harness as a
+coherent whole; the held-out harnesses are therefore unseen as interfaces, not
+as vocabularies. Training surfaces keep first-class file tools, so a shell-only
+surface such as \codexcli{}'s is never rendered into training data. Whether the
+effect scales with model size, holds for a shell-only source harness, or
+separates into the contributions of surface diversity and anonymization
+remains open.
 
 \end{document}
