@@ -521,7 +521,7 @@ the same property from training data alone.
 \label{sec:step-matched}
 
 \begin{figure}[t]
-\begin{center}\includegraphics[width=\textwidth]{pic/e1_step_matched.pdf}
+\begin{center}\includegraphics[width=0.85\textwidth]{pic/e1_step_matched.pdf}
 \end{center}
 \caption{\method{} versus the \control{}, both fine-tuned from \basemodel{}:
 pass@1 (\%) on \swev{} and \swem{} under each harness, the fine-tuned models
@@ -534,23 +534,20 @@ the spread, are in Table~\ref{tab:e1}.}
 \label{fig:e1}
 \end{figure}
 
-Figure~\ref{fig:e1} gives the result, with full numbers in
-Table~\ref{tab:e1}. Fine-tuning on one harness raised accuracy on that harness
+Figure~\ref{fig:e1} gives the result (full numbers in Table~\ref{tab:e1}). Fine-tuning on one harness raised accuracy on that harness
 and made the model more dependent on it: on Verified the control gains $9.4$
 points over the base model under \claudecode{}, the harness its data came
-from, but less than the noise floor under \codexcli{} ($68.0\%$ before
-fine-tuning, $66.7\%$ after), so its spread across harnesses grows from $3.4$
-to $11.7$ points. \method{} improves on the base model by $7.6$ points on
+from, but less than the noise floor under \codexcli{}, so its spread across
+harnesses grows from $3.4$ to $11.7$ points. \method{} improves on the base model by $7.6$ points on
 Verified and $10.3$ on Multilingual on average, against the control's $5.0$
 and $6.6$, and its gain is spread across harnesses. On the source harness it
-is level with the control on Verified ($78.6\%$ against $78.4\%$, within the
-noise floor) and ahead on Multilingual ($75.0\%$ against $68.7\%$), although
-it never trained on \claudecode{}'s own surface. Under the three unseen
+is level with the control on Verified ($78.6\%$ against $78.4\%$) and ahead
+on Multilingual ($75.0\%$ against $68.7\%$), although it never trained on
+\claudecode{}'s own surface. Under the three unseen
 production harnesses it is ahead on both benchmarks, by $2.8$, $4.5$ and $8.7$
 points on Verified and by $1.5$, $2.3$ and $7.4$ on Multilingual; the largest
 gap is under \codexcli{}, whose shell-only surface lies outside the surfaces
-\chr{} renders for training (Appendix~\ref{sec:limits}). The advantage is
-therefore largest where the control is weakest: \method{}'s worst harness is
+\chr{} renders for training (Appendix~\ref{sec:limits}). The advantage is largest where the control is weakest: \method{}'s worst harness is
 $8.7$ points (Verified) and $7.4$ points (Multilingual) above the control's,
 and on Multilingual its five accuracies lie within $1.6$ points
 ($73.4$--$75.0\%$), a tighter range than the base model's own $7.0$. Against
@@ -560,11 +557,9 @@ ahead in seven of the ten cells, level in two (\claudecode{} on Verified,
 
 That one cell is \cham{} on Verified, where the control leads by $2.8$ points
 ($78.4\%$ against $75.6\%$). \cham{}'s configuration comes from the space
-\method{}'s training surfaces were sampled from, so this is not a failure to
-reach an unseen surface, and we do not have an explanation for it. An earlier
-run of the same comparison on a weaker base model with a different recipe is
-reported in Appendix~\ref{app:e1-30b}; there \method{}'s advantage appeared on
-Multilingual only.
+\method{}'s training surfaces were sampled from, so this is not a failure to reach an unseen surface; we have no explanation
+for it. An earlier run on a weaker base model with a different recipe
+(Appendix~\ref{app:e1-30b}) showed \method{}'s advantage on Multilingual only.
 
 \subsection{Real trajectories from more harnesses}
 \label{sec:real}
@@ -647,7 +642,7 @@ schemes.
 
 \begin{figure}[t]
 \begin{center}
-\includegraphics[width=\textwidth]{pic/chameleon_axes.pdf}
+\includegraphics[width=0.85\textwidth]{pic/chameleon_axes.pdf}
 \end{center}
 \caption{\cham{} surfaces that move surface axes, one or several at a time,
 away from a \claudecode{}-like origin (\swem{}, one evaluation per surface).
@@ -685,8 +680,8 @@ axis changes at once.
 \section{Related work}
 \label{sec:related}
 
-\citet{yang2024sweagent} showed that the agent--computer interface itself
-materially determines performance, and recent measurements find that the
+\citet{yang2024sweagent} showed that the agent--computer interface materially
+determines performance, and recent measurements find that the
 choice of scaffold moves scores by as much as the choice of model
 \citep{zhang2026stopcomparing,yao2026harnessbench,zheng2026clawswebench}.
 Data pipelines such as SWE-Gym \citep{pan2024swegym}, SWE-smith
@@ -704,22 +699,21 @@ space rather than by a penalty as in invariant risk minimization
 \citep{arjovsky2019irm}. The Agent Data Protocol \citep{song2025adp} also
 defines a scaffold-independent trajectory representation, compiled into fixed
 target formats; ours is recovered from production harnesses by
-normalization, factored into axes that are sampled, and proved invertible.
+normalization, factored into sampled axes, and proved invertible.
 Appendix~\ref{app:related} discusses further related work.
 
 \section{Conclusion}
 
 Agent harnesses differ far more on the surface than in substance: four
-production harnesses reduce to $12$ semantic actions, and the surface map
-between them is invertible on real actions. Making that core explicit as the
-\HP{} turns interface variation into a nuisance factor that a training
+production harnesses reduce to $12$ semantic actions, and making that core
+explicit as the \HP{} turns interface variation into a nuisance factor that a training
 pipeline can marginalize over, and \method{} does so with no new task data
-and no architectural change: at an equal number of training steps it matches
-a single-harness control on that control's harness, is ahead under every
-unseen production harness by up to $8.7$ points, and performs on a par with
-training on real trajectories collected in four harnesses. Aligning hidden
-representations across renderings of the same decision point, which
-Proposition~1 makes well posed, is the natural next step.
+and no architectural change: it matches a single-harness control on that
+control's harness, is ahead under every
+unseen production harness by up to $8.7$ points, and is on a par with
+training on real trajectories from four harnesses. Aligning hidden
+representations across renderings of the same decision point is the natural
+next step.
 Appendix~\ref{sec:limits} discusses the limitations of this study.
 
 \subsection*{AI use statement}
