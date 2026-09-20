@@ -436,30 +436,26 @@ carrying the information needed to act.
 \paragraph{Model and data.} We fine-tune \basemodel{} \citep{qwen36card} on
 $9{,}366$ \claudecode{} trajectories collected with GLM-5.3 \citep{glm53card}
 as the teacher on SWE-rebench-V2 instances \citep{badertdinov2026swerebenchv2},
-one per task instance; the instances are deduplicated against both evaluation
-benchmarks, so no training task appears in \swev{} or \swem{}. Normalization moves every call out of the text channels, and we
-check that no call text remains in the reasoning or observations of any kept
-trajectory. After dropping trajectories containing unmapped tools or fewer than
-three semantic actions, $8{,}677$ remain; \chr{} renders each into $M=3$
-counterfactual surfaces, yielding $\numsurfaces{}$ samples, each under its own
-surface configuration, with $21{,}476$ distinct tool names; $30\%$ of samples
-are anonymized. The samples vary $A_1$, $A_3$, $A_4$ and $A_5$ ($10{,}335$
-split, $10{,}511$ unified-editor and $5{,}185$ monolithic surfaces) and all use
-native function calling. \method{} trains on these rendered samples alone. Both runs are
-full-parameter fine-tuning with a global batch of $128$ packed sequences of up
-to $256$K tokens and learning rate $5\times10^{-5}$ with cosine decay.
+one per task instance and deduplicated against both evaluation benchmarks.
+After dropping trajectories with unmapped tools or fewer than three semantic
+actions, $8{,}677$ remain; \chr{} renders each into $M=3$ counterfactual
+surfaces, yielding \numsurfaces{} samples with $21{,}476$ distinct tool names,
+$30\%$ of them anonymized, all in native function calling
+(Appendix~\ref{app:eval} gives the surface statistics). \method{} trains on
+these rendered samples alone. Both runs are full-parameter fine-tuning with a
+global batch of $128$ packed sequences of up to $256$K tokens and learning
+rate $5\times10^{-5}$ with cosine decay.
 
 \paragraph{Step-matched control.} Rendering multiplies the data: the
 rendered set holds about $1.7\times$ the tokens of the original trajectories,
 so a gain could come from extra optimization rather than from surface
-diversity. We therefore match optimizer steps. The \control{} trains on the
-original \claudecode{} trajectories for three epochs, which is $67$ steps;
-\method{} trains for the same $67$ steps, about $1.8$ passes over its rendered
-set. With sequence packing, equal steps at an equal batch size are also
+diversity. We therefore match optimizer steps: the \control{} trains on the
+original \claudecode{} trajectories for three epochs, $67$ steps, and
+\method{} for the same $67$ steps, about $1.8$ passes over its rendered set;
+with sequence packing, equal steps at an equal batch size are also
 approximately equal training tokens. The two runs differ only in their data:
-the control sees each trajectory three times in its original surface, and
-\method{} sees it in three different surfaces, none of which is
-\claudecode{}'s own.
+the control sees each trajectory three times in its original surface,
+\method{} in three different surfaces, none of which is \claudecode{}'s own.
 
 \paragraph{\cham{}.} Real harnesses cannot be perturbed one axis at a time:
 there is no way to give \claudecode{} \openhands{}'s observation format while
@@ -471,25 +467,22 @@ configuration, which makes it both the instrument for single-axis controlled
 experiments (Section~\ref{sec:axes}) and an environment for evaluation under
 arbitrary synthetic harnesses.
 
-\paragraph{Evaluation.} We evaluate on two benchmarks and report pass@1.
-\swev{} is a human-validated subset of SWE-bench \citep{jimenez2024swebench}:
-$500$ tasks from $12$ Python repositories. \swem{} \citep{yang2025swesmith}
-has $300$ tasks in nine other programming languages (C, C++, Go, Java,
-JavaScript, TypeScript, PHP, Ruby and Rust); we refer to the two as Verified
-and Multilingual. In
-Sections~\ref{sec:harness-choice} and~\ref{sec:step-matched}, every model
-runs under the four production harnesses of Table~\ref{tab:harnesses} and
-under \cham{} with one fixed configuration, and all models are served with
-vLLM \citep{kwon2023vllm} on the same serving stack;
-Section~\ref{sec:harness-choice} evaluates three open-weight models,
-Qwen3.5-35B-A3B \citep{qwen35card}, \basemodel{} and KAT-Coder-V2.5-Dev
-\citep{huang2026katcoder}, once per cell, and Section~\ref{sec:step-matched}
-evaluates the two fine-tuned models and averages three evaluations per cell.
-The later experiments state their own conditions. We call \opencode{},
+\paragraph{Evaluation.} We report pass@1 on \swev{}
+\citep{jimenez2024swebench}, $500$ human-validated tasks from $12$ Python
+repositories, and on \swem{} \citep{yang2025swesmith}, $300$ tasks in nine
+other programming languages; we call them Verified and Multilingual. Every
+model runs under the four production harnesses of Table~\ref{tab:harnesses}
+and under \cham{} with one fixed configuration, served with vLLM
+\citep{kwon2023vllm} on one serving stack. Section~\ref{sec:harness-choice}
+evaluates Qwen3.5-35B-A3B \citep{qwen35card}, \basemodel{} and
+KAT-Coder-V2.5-Dev \citep{huang2026katcoder} once per cell,
+Section~\ref{sec:step-matched} averages three evaluations per cell, and the
+later experiments state their own conditions. We call \opencode{},
 \openhands{} and \codexcli{} unseen because training never presented any of
-them as a coherent harness; Section~\ref{sec:limits} counts the rendered
-samples that carry one of their tool names. Appendix~\ref{app:eval} gives the run-to-run noise floor and summarizes the
-settings of every experiment in Table~\ref{tab:settings}.
+them as a coherent harness (Section~\ref{sec:limits} counts the rendered
+samples that carry one of their tool names). Appendix~\ref{app:eval} gives the
+run-to-run noise floor and summarizes the settings of every experiment in
+Table~\ref{tab:settings}.
 
 \subsection{Harness choice alone}
 \label{sec:harness-choice}
@@ -537,84 +530,51 @@ aims to obtain the same property from the training data alone.
 \subsection{\method{} versus a step-matched control}
 \label{sec:step-matched}
 
-\begin{table}[t]
-\caption{\method{} versus the \control{}, both fine-tuned from \basemodel{}:
-pass@1 (\%) on \swev{} and \swem{}. Fine-tuned cells are means of three
-evaluations; Base is the model before fine-tuning (Table~\ref{tab:e0}).
-$\Delta$ is \method{} minus control, and bold marks the better of the two (the
-lower, for spread). Mean, worst and spread are taken over the five harnesses;
-the noise floor of a single evaluation is $\pm2.0$ on Verified and $\pm1.0$ on
-Multilingual.}
-\label{tab:e1}
-\begin{center}
-\begin{small}
-\setlength{\tabcolsep}{4.5pt}
-\begin{tabular}{@{}l S[table-format=2.1] S[table-format=2.1] S[table-format=2.1] S[table-format=+1.1] @{\hspace{16pt}} S[table-format=2.1] S[table-format=2.1] S[table-format=2.1] S[table-format=+1.1]@{}}
-\toprule
- & \multicolumn{4}{c}{\swev{}} & \multicolumn{4}{c}{\swem{}} \\
-\cmidrule(r){2-5}\cmidrule(l){6-9}
-Harness & {Base} & {Control} & {\method{}} & {$\Delta$} & {Base} & {Control} & {\method{}} & {$\Delta$} \\
-\midrule
-\claudecode{} (source) & 69.0 & 78.4 & \bfseries 78.6 & +0.2 & 62.3 & 68.7 & \bfseries 75.0 & +6.3 \\
-\opencode{}            & 71.4 & 74.3 & \bfseries 77.1 & +2.8 & 68.3 & 71.9 & \bfseries 73.4 & +1.5 \\
-\openhands{}           & 71.0 & 77.2 & \bfseries 81.7 & +4.5 & 64.3 & 71.7 & \bfseries 74.0 & +2.3 \\
-\codexcli{}            & 68.0 & 66.7 & \bfseries 75.4 & +8.7 & 61.3 & 66.0 & \bfseries 73.4 & +7.4 \\
-\cham{}                & 70.8 & \bfseries 78.4 & 75.6 & -2.8 & 62.3 & 73.4 & \bfseries 74.4 & +1.0 \\
-\midrule
-Mean                   & 70.0 & 75.0 & \bfseries 77.7 & +2.7 & 63.7 & 70.3 & \bfseries 74.0 & +3.7 \\
-Worst                  & 68.0 & 66.7 & \bfseries 75.4 & +8.7 & 61.3 & 66.0 & \bfseries 73.4 & +7.4 \\
-Spread                 & 3.4  & 11.7 & \bfseries 6.3  & -5.4 & 7.0  & 7.4  & \bfseries 1.6  & -5.8 \\
-\bottomrule
-\end{tabular}
-\end{small}
-\end{center}
-\end{table}
-
 \begin{figure}[t]
 \begin{center}\includegraphics[width=\textwidth]{pic/e1_step_matched.pdf}
 \end{center}
-\caption{Table~\ref{tab:e1} by harness. Each row places the base model (open
+\caption{\method{} versus the \control{}, both fine-tuned from \basemodel{}:
+pass@1 (\%) on \swev{} and \swem{} under each harness, the fine-tuned models
+averaged over three evaluations. Each row places the base model (open
 diamond), the control (grey square) and \method{} (orange circle); the bar
 joins the two fine-tuned models, and the number to its right is \method{} minus
-control, grey when within the single-evaluation noise floor. On Verified the
-control's gain over the base model is largest on its source harness and
-vanishes on \codexcli{}; \method{}'s gain is spread across harnesses, and on
-Multilingual its five accuracies lie within $1.6$ points.}
+control, grey when within the single-evaluation noise floor ($\pm2.0$ on
+Verified, $\pm1.0$ on Multilingual). Full numbers, with the worst harness and
+the spread, are in Table~\ref{tab:e1}.}
 \label{fig:e1}
 \end{figure}
 
-Table~\ref{tab:e1} and Figure~\ref{fig:e1} give the result. Both fine-tuned
-models improve on the base model on average, the control by $5.0$ points on
-Verified and $6.6$ on Multilingual, \method{} by $7.6$ and $10.3$. Where the control's gain lands illustrates the problem of
-Section~\ref{sec:intro}.
-On Verified it gains $9.4$ points under \claudecode{}, the harness its data came
-from, $2.9$ under \opencode{}, and less than the noise floor under \codexcli{}
-($68.0\%$ before fine-tuning, $66.7\%$ after), so its spread across harnesses grows from $3.4$
-to $11.7$ points. Fine-tuning on one harness raised accuracy on that harness and made the model
-more dependent on it.
-
-On the source harness \method{} is level with the control on Verified
-($78.6\%$ against $78.4\%$, within the noise floor) and ahead on Multilingual
-($75.0\%$ against $68.7\%$), although it never trained on \claudecode{}'s own
-surface. Under the three unseen production
-harnesses it is ahead on both benchmarks, by $2.8$, $4.5$ and $8.7$ points on
-Verified and by $1.5$, $2.3$ and $7.4$ on Multilingual. The largest gap is under
-\codexcli{}, whose shell-only surface lies outside the surfaces \chr{} renders
-for training (Section~\ref{sec:limits}). The advantage is therefore largest where the control is weakest:
-\method{}'s worst harness is $8.7$ points (Verified) and $7.4$ points
-(Multilingual) above the control's, and on Multilingual its five accuracies lie
-within $1.6$ points ($73.4$--$75.0\%$), a tighter range than the base model's
-own $7.0$. Against the single-evaluation noise floor (Appendix~\ref{app:eval}), \method{} is ahead in
-seven of the ten cells, level in two (\claudecode{} on Verified, \cham{} on
-Multilingual), and behind in one.
+Figure~\ref{fig:e1} gives the result, with full numbers in
+Table~\ref{tab:e1}. Fine-tuning on one harness raised accuracy on that harness
+and made the model more dependent on it: on Verified the control gains $9.4$
+points over the base model under \claudecode{}, the harness its data came
+from, but less than the noise floor under \codexcli{} ($68.0\%$ before
+fine-tuning, $66.7\%$ after), so its spread across harnesses grows from $3.4$
+to $11.7$ points. \method{} improves on the base model by $7.6$ points on
+Verified and $10.3$ on Multilingual on average, against the control's $5.0$
+and $6.6$, and its gain is spread across harnesses. On the source harness it
+is level with the control on Verified ($78.6\%$ against $78.4\%$, within the
+noise floor) and ahead on Multilingual ($75.0\%$ against $68.7\%$), although
+it never trained on \claudecode{}'s own surface. Under the three unseen
+production harnesses it is ahead on both benchmarks, by $2.8$, $4.5$ and $8.7$
+points on Verified and by $1.5$, $2.3$ and $7.4$ on Multilingual; the largest
+gap is under \codexcli{}, whose shell-only surface lies outside the surfaces
+\chr{} renders for training (Section~\ref{sec:limits}). The advantage is
+therefore largest where the control is weakest: \method{}'s worst harness is
+$8.7$ points (Verified) and $7.4$ points (Multilingual) above the control's,
+and on Multilingual its five accuracies lie within $1.6$ points
+($73.4$--$75.0\%$), a tighter range than the base model's own $7.0$. Against
+the single-evaluation noise floor (Appendix~\ref{app:eval}), \method{} is
+ahead in seven of the ten cells, level in two (\claudecode{} on Verified,
+\cham{} on Multilingual), and behind in one.
 
 That one cell is \cham{} on Verified, where the control leads by $2.8$ points
 ($78.4\%$ against $75.6\%$). \cham{}'s configuration comes from the space
 \method{}'s training surfaces were sampled from, so this is not a failure to
-reach an unseen surface of the kind the other production-harness rows measure, and we do not
-have an explanation for it. An earlier run of the same comparison on a weaker
-base model with a different recipe is reported in Appendix~\ref{app:e1-30b};
-there \method{}'s advantage appeared on Multilingual only.
+reach an unseen surface, and we do not have an explanation for it. An earlier
+run of the same comparison on a weaker base model with a different recipe is
+reported in Appendix~\ref{app:e1-30b}; there \method{}'s advantage appeared on
+Multilingual only.
 
 \subsection{Real trajectories from more harnesses}
 \label{sec:real}
@@ -630,34 +590,26 @@ evaluation per cell). \textbf{(a)}~\swev{}. \textbf{(b)}~\swem{}.}
 \end{figure}
 
 A direct alternative to rendering counterfactual surfaces is to collect real
-trajectories in several harnesses, and we compare the two on
-\oldmodel{}, the base model of Appendix~\ref{app:e1-30b}. The \method{} model of that appendix trains on \claudecode{} trajectories
-mixed with their \chr{} renderings. The alternative trains on real
-trajectories collected in four harnesses, \claudecode{}, \opencode{},
-\openhands{} and \codexcli{}, with the same schedule and the same number of
-optimizer steps. Both models are evaluated under the four production harnesses
-and \cham{}, once per cell. Four of the five surfaces occur in the training
-data of the model trained on real trajectories, and only \cham{} is unseen for
-it, whereas for \method{} every surface but \claudecode{} is unseen.
-As Figure~\ref{fig:real} shows, \method{} is ahead under \claudecode{},
-$48.2\%$ against $31.8\%$ on Verified and $35.7\%$ against $21.0\%$ on
-Multilingual, and under \opencode{}, by $3.8$ points on Verified ($42.0\%$
-against $38.2\%$) and $10.3$ on Multilingual ($31.0\%$ against $20.7\%$),
-although the other model trained on \opencode{} trajectories. Under
-\openhands{} and \codexcli{}, both in that model's training data, and under
-\cham{}, the two are within a few points of each other: $58.4\%$ against
-$54.0\%$ and $44.7\%$ against $43.3\%$ under \openhands{}, $40.2\%$ against
-$37.1\%$ and $22.6\%$ against $24.4\%$ under \codexcli{}, and $42.4\%$
-against $40.2\%$ and $26.0\%$ against $24.0\%$ under \cham{}. Averaged over
-the five harnesses \method{} is $2.1$ points higher on Verified and $4.7$ on
-Multilingual, and its accuracy varies across harnesses by $16.9$ and $19.3$
-points against the other model's $26.6$ and $24.0$. At an equal step budget,
-then, training data whose surfaces are synthetic performs on a par with real
-trajectories distilled in the target harnesses themselves: \method{} is ahead
-under two of the four harnesses the other model trained in, within a few
-points under the other two and under \cham{}, and higher on average. The two
-training sets also differ in their tasks, so the comparison is between two
-data pipelines rather than between surfaces alone.
+trajectories in several harnesses. We compare the two on \oldmodel{}, the base
+model of Appendix~\ref{app:e1-30b}: the \method{} model of that appendix
+trains on \claudecode{} trajectories mixed with their \chr{} renderings, and
+the alternative trains on real trajectories collected in \claudecode{},
+\opencode{}, \openhands{} and \codexcli{} with the same schedule and the same
+number of optimizer steps. Four of the five evaluation surfaces thus occur in
+the alternative's training data, whereas for \method{} every surface but
+\claudecode{} is unseen. As Figure~\ref{fig:real} shows, \method{} is
+nonetheless ahead under \claudecode{} ($48.2\%$ against $31.8\%$ on Verified,
+$35.7\%$ against $21.0\%$ on Multilingual) and under \opencode{}, by $3.8$ and
+$10.3$ points, although the other model trained on \opencode{} trajectories,
+and it is within a few points of the other model under \openhands{},
+\codexcli{} and \cham{}. Averaged over the five harnesses it is $2.1$ points
+higher on Verified and $4.7$ on Multilingual, and its accuracy varies across
+harnesses by $16.9$ and $19.3$ points against the other model's $26.6$ and
+$24.0$. At an equal step budget, then, training data whose surfaces are
+synthetic performs on a par with real trajectories distilled in the target
+harnesses themselves. The two training sets also differ in their tasks, so
+the comparison is between two data pipelines rather than between surfaces
+alone.
 
 \subsection{Test-time anonymization of the interface}
 \label{sec:anon}
@@ -667,8 +619,8 @@ data pipelines rather than between surfaces alone.
 \includegraphics[width=\textwidth]{pic/anon_names.pdf}
 \end{center}
 \caption{Anonymizing tool and parameter names under \cham{} on \swem{}, for
-\basemodel{} before fine-tuning and the \method{} model of Table~\ref{tab:e1},
-one evaluation per setting. \textbf{(a)}~Pass@1 as more names are replaced.
+\basemodel{} before fine-tuning and the \method{} model of
+Section~\ref{sec:step-matched}, one evaluation per setting. \textbf{(a)}~Pass@1 as more names are replaced.
 \textbf{(b)}~Tasks whose outcome flips when all names are replaced.}
 \label{fig:anon}
 \end{figure}
@@ -684,11 +636,10 @@ $8$, respectively), and then all of them, with meaningless identifiers, so
 that, for example, \texttt{run\_command} becomes \texttt{zete}. The tool
 descriptions are identical across settings and the system prompt names no
 tool, so what each tool does remains readable throughout. \basemodel{} before
-fine-tuning and the \method{} model of Table~\ref{tab:e1} are each evaluated
-once per setting on \swem{} and compared only with their own run under the
-original names; because these runs are separate from those of
-Tables~\ref{tab:e0} and~\ref{tab:e1}, only differences
-between settings are interpreted. As Figure~\ref{fig:anon} shows, \method{}'s
+fine-tuning and the \method{} model of Section~\ref{sec:step-matched} are
+each evaluated once per setting on \swem{} and compared only with their own
+run under the original names, so only differences between settings are
+interpreted. As Figure~\ref{fig:anon} shows, \method{}'s
 accuracy is unchanged ($74.3\%$, $74.6\%$ and $74.3\%$), and with all names
 replaced it newly fails exactly as many tasks as it newly solves ($22$ each).
 The base model falls from $68.0\%$ to $67.3\%$ and $64.0\%$, losing $29$ tasks
@@ -723,40 +674,29 @@ each at $d=0$, $2$ and $4$); open markers are the four single-axis surfaces.}
 Production harnesses differ on several surface axes at once, so
 Section~\ref{sec:step-matched} cannot say which axis a model is bound to, and
 Section~\ref{sec:anon} isolates only one cue; \cham{} can move the axes one at
-a time. We start from an origin
-configuration that mimics \claudecode{}, with its split tools and their names
-and parameters, an engineering system prompt with formal tool documentation,
-numbered file views and \claudecode{}'s turn conventions, and move each axis in turn to a pre-selected far setting. A1 merges the tools into a single monolithic tool
-with anonymized tool and parameter names; A3 changes the persona of the system
-prompt and renders the tool documentation as tables; A4 drops line numbers,
-wraps observations in a fence, truncates them at $2{,}000$ characters and
-changes the markers for empty and failed output; A5 removes the runtime
-reminder, adds a turn header, returns observations as user turns and ends an
-episode with a finish call. Two further surfaces change A1 and A5 together and
-all four axes. The call syntax (A2) is fixed by native function calling, and
-every surface exposes the same actions. We evaluate the \method{} model of
-Appendix~\ref{app:e1-30b} and a control fine-tuned from the same base model,
-\oldmodel{}, on the same \claudecode{} trajectories alone, once
-per surface on \swem{}. These runs use a different evaluation environment from
-Appendix~\ref{app:e1-30b} and exclude the few episodes
-still running when a cell was closed (at most $15$ of $300$), so their absolute
-accuracies are not comparable with Table~\ref{tab:e1-30b} and only differences
-between surfaces are interpreted. The control is bound to A1 (Figure~\ref{fig:axes}a): changing
+a time. We start from an origin configuration that mimics \claudecode{} and
+move each of A1, A3, A4 and A5 in turn to a pre-selected far setting: a
+monolithic tool with anonymized names for A1, a different persona and tabular
+documentation for A3, unnumbered, fenced and truncated observations for A4,
+and observations as user turns with a finish call for A5
+(Appendix~\ref{app:eval} lists the settings); two further surfaces change A1
+and A5 together and all four axes. The call syntax (A2) is fixed by native
+function calling, and every surface exposes the same actions. We evaluate the
+\method{} model of Appendix~\ref{app:e1-30b} and a control fine-tuned from the
+same base model, \oldmodel{}, on the same \claudecode{} trajectories alone,
+once per surface on \swem{}; these runs use a different evaluation environment
+from Appendix~\ref{app:e1-30b}, so only differences between surfaces are
+interpreted. The control is bound to A1 (Figure~\ref{fig:axes}a): changing
 naming and granularity alone takes it from $15.1\%$ on the origin to $3.3\%$,
-and it stays at that level whenever A1 is changed ($3.8\%$ with A1 and A5,
-$3.4\%$ with all four axes), whereas changing A3, A4 or A5 alone leaves it
-between $12.2\%$ and $15.8\%$. \method{} is not: with A1 changed alone it scores
-$28.3\%$ against $24.0\%$ on the origin, and with A1 and A5 changed together
-$33.7\%$; only the surface that changes all four axes brings it down, to
-$17.0\%$. \method{} is ahead of the control on every surface, by $8.9$ points on
-the origin and by $29.9$ points when A1 and A5 are changed together, and
-averaged over the surfaces at each distance from the origin (one surface each
-at $d=0$, $2$ and $4$, four at $d=1$) its accuracy is $24.0\%$, $26.4\%$,
-$33.7\%$ and $17.0\%$ for $d=0$, $1$, $2$ and $4$, against
-$15.1\%$, $11.0\%$, $3.8\%$ and $3.4\%$ for the control
-(Figure~\ref{fig:axes}b). A model trained on one harness has thus absorbed that
-harness's tool vocabulary and granularity as part of the task, which \method{}
-has not; what remains for \method{} is a loss when every axis changes at once.
+and it stays there whenever A1 is changed, whereas changing A3, A4 or A5 alone
+costs it at most $2.9$ points. \method{} is not: with A1 changed alone it
+scores $28.3\%$ against $24.0\%$ on the origin, and it is ahead of the control
+on every surface, by $8.9$ points on the origin and by up to $29.9$
+(Figure~\ref{fig:axes}b); only the surface that changes all four axes brings
+it down, to $17.0\%$. A model trained on one harness has thus absorbed that
+harness's tool vocabulary and granularity as part of the task, which
+\method{} has not; what remains for \method{} is a loss when every axis
+changes at once.
 
 \section{Limitations}
 \label{sec:limits}
@@ -1582,6 +1522,62 @@ few tool names:
 \texttt{str\_replace\_editor} in place of \texttt{terminal} and
 \texttt{file\_editor} and has no task tracker. Figure~\ref{fig:ana-examples}
 quotes the evaluated names verbatim.
+
+\paragraph{Training-surface statistics.} Of the \numsurfaces{} rendered
+samples of Section~\ref{sec:setup}, $10{,}335$ use split tools, $10{,}511$ a
+unified editor and $5{,}185$ a monolithic tool; the samples vary $A_1$, $A_3$,
+$A_4$ and $A_5$ and fix $A_2$ to native function calling. Normalization moves
+every call out of the text channels, and we check that no call text remains
+in the reasoning or observations of any kept trajectory.
+
+\paragraph{Full numbers of the step-matched comparison.}
+Table~\ref{tab:e1} lists the cells behind Figure~\ref{fig:e1}.
+
+\begin{table}[ht]
+\caption{Full numbers behind Figure~\ref{fig:e1}: \method{} versus the
+\control{}, both fine-tuned from \basemodel{}, pass@1 (\%) on \swev{} and
+\swem{}. Fine-tuned cells are means of three evaluations; Base is the model
+before fine-tuning (Table~\ref{tab:e0}). $\Delta$ is \method{} minus control,
+and bold marks the better of the two (the lower, for spread). Mean, worst and
+spread are taken over the five harnesses.}
+\label{tab:e1}
+\begin{center}
+\begin{small}
+\setlength{\tabcolsep}{4.5pt}
+\begin{tabular}{@{}l S[table-format=2.1] S[table-format=2.1] S[table-format=2.1] S[table-format=+1.1] @{\hspace{16pt}} S[table-format=2.1] S[table-format=2.1] S[table-format=2.1] S[table-format=+1.1]@{}}
+\toprule
+ & \multicolumn{4}{c}{\swev{}} & \multicolumn{4}{c}{\swem{}} \\
+\cmidrule(r){2-5}\cmidrule(l){6-9}
+Harness & {Base} & {Control} & {\method{}} & {$\Delta$} & {Base} & {Control} & {\method{}} & {$\Delta$} \\
+\midrule
+\claudecode{} (source) & 69.0 & 78.4 & \bfseries 78.6 & +0.2 & 62.3 & 68.7 & \bfseries 75.0 & +6.3 \\
+\opencode{}            & 71.4 & 74.3 & \bfseries 77.1 & +2.8 & 68.3 & 71.9 & \bfseries 73.4 & +1.5 \\
+\openhands{}           & 71.0 & 77.2 & \bfseries 81.7 & +4.5 & 64.3 & 71.7 & \bfseries 74.0 & +2.3 \\
+\codexcli{}            & 68.0 & 66.7 & \bfseries 75.4 & +8.7 & 61.3 & 66.0 & \bfseries 73.4 & +7.4 \\
+\cham{}                & 70.8 & \bfseries 78.4 & 75.6 & -2.8 & 62.3 & 73.4 & \bfseries 74.4 & +1.0 \\
+\midrule
+Mean                   & 70.0 & 75.0 & \bfseries 77.7 & +2.7 & 63.7 & 70.3 & \bfseries 74.0 & +3.7 \\
+Worst                  & 68.0 & 66.7 & \bfseries 75.4 & +8.7 & 61.3 & 66.0 & \bfseries 73.4 & +7.4 \\
+Spread                 & 3.4  & 11.7 & \bfseries 6.3  & -5.4 & 7.0  & 7.4  & \bfseries 1.6  & -5.8 \\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{center}
+\end{table}
+
+\paragraph{Surfaces of Section~\ref{sec:axes}.} The origin mimics
+\claudecode{}: split tools with its names and parameters, an engineering
+system prompt with formal tool documentation, numbered file views and
+\claudecode{}'s turn conventions. The far settings are: A1 merges the tools
+into a single monolithic tool with anonymized tool and parameter names; A3
+changes the persona of the system prompt and renders the tool documentation
+as tables; A4 drops line numbers, wraps observations in a fence, truncates
+them at $2{,}000$ characters and changes the markers for empty and failed
+output; A5 removes the runtime reminder, adds a turn header, returns
+observations as user turns and ends an episode with a finish call. These runs
+exclude the few episodes still running when a cell was closed (at most $15$
+of $300$), so their absolute accuracies are not comparable with
+Table~\ref{tab:e1-30b}.
 
 \paragraph{Settings of every experiment.} Table~\ref{tab:settings} lists, for
 each experiment, the models compared, the harnesses and benchmarks, the number
