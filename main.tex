@@ -104,32 +104,29 @@ harnesses.
 \section{Introduction}
 \label{sec:intro}
 
-Recent years have seen rapid progress in LLM agents for software engineering.
-Given an issue reported against a real GitHub repository, an agent such as
-\claudecode{} \citep{anthropic2025claudecode}, \codexcli{}
-\citep{openai2025codex}, \opencode{} \citep{opencode2025} or \openhands{}
-\citep{wang2025openhandssdk} explores the codebase,
-edits files, runs tests, and returns a patch, and SWE-bench
-\citep{jimenez2024swebench} has become the standard measure of how often that
-patch is correct. Underneath every such agent is a language model wrapped in a
-scaffold: a system prompt that documents a tool set, a protocol for emitting
-calls, an executor, and a formatter that returns observations. This wrapper, the \emph{harness} (also called a scaffold), is what the model actually sees.
+LLM agents now resolve real software issues end to end. Given an issue
+against a GitHub repository, an agent explores the codebase, edits files,
+runs tests and returns a patch, and SWE-bench \citep{jimenez2024swebench}
+measures how often that patch is correct. The model never acts on the
+repository directly: it acts through a \emph{harness}, the scaffold that
+documents a tool set in the system prompt, defines how calls are written,
+executes them and formats what comes back. Several harnesses are in
+production use, among them \claudecode{} \citep{anthropic2025claudecode},
+\codexcli{} \citep{openai2025codex}, \opencode{} \citep{opencode2025} and
+\openhands{} \citep{wang2025openhandssdk}, and a model is expected to work in
+any of them.
 
-The four harnesses above all let an agent run shell commands and edit files,
-but they disagree on nearly every detail of how: whether reading a file is a
-first-class tool or a shell command, whether that tool is called \texttt{Read}
-or \texttt{read} or \texttt{file\_editor} with
-\texttt{command="view"}, whether output carries line numbers, and whether an
-episode ends with a \texttt{finish} call or a plain reply. Changing \emph{only} the harness for a fixed instruction-tuned model and task
-set (Table~\ref{tab:e0}) moves \swev{} accuracy by up to $9.0$ points, from $58.6\%$ to $67.6\%$ for Qwen3.5-35B-A3B across five
-harnesses. Training makes the dependence worse: trajectories are collected in
-whichever harness the data pipeline uses, and supervised fine-tuning (SFT) on
-them teaches the task \emph{and} the surface at once, so a different harness at deployment is,
-from the model's perspective, a change of task (Figure~\ref{fig:overview},
-left). Fine-tuning \basemodel{} on \claudecode{} trajectories raises its
-\claudecode{} accuracy on \swev{} from $69.0\%$ to $78.4\%$ but does not improve its \codexcli{} accuracy ($68.0\%$ before, $66.7\%$
-after), widening its spread across harnesses from $3.4$ to $11.7$ points
-(Section~\ref{sec:step-matched}).
+The same model, however, does not perform the same across harnesses, and
+fine-tuning widens the gap. With model and tasks fixed, changing only the
+harness moves \swev{} accuracy by up to $9.0$ points (Table~\ref{tab:e0}).
+Fine-tuning then binds the model to one harness: trajectories are collected
+in whichever harness the data pipeline uses, and supervised fine-tuning (SFT)
+on them teaches the task and that harness's interface at once. Fine-tuning
+\basemodel{} on \claudecode{} trajectories helps it most under \claudecode{}
+and not at all under \codexcli{}, widening its spread across harnesses from
+$3.4$ to $11.7$ points (Figure~\ref{fig:overview}, left). Since training data
+come from one harness but models are deployed in many, every new harness
+would otherwise call for new trajectories.
 
 \begin{figure}[t]
 \begin{center}
@@ -145,57 +142,51 @@ invariant to the surface rather than bound to it.}
 \label{fig:overview}
 \end{figure}
 
-We argue that this shift is avoidable, because the disagreement between
-harnesses is superficial in a measurable sense. Normalizing \numactions{} tool
-calls from the four harnesses into semantic actions, we find that a
-vocabulary of $12$ covers $99.96\%$ of them (Table~\ref{tab:vocab}): the
-harnesses are not doing different things, they are naming and packaging the
-same things differently. We make this core explicit and call it the \HP{}. A
-concrete harness is then the protocol plus a \emph{surface}, five axes that
-can be set independently: tool granularity and naming, call syntax, prompt
-documentation, observation formatting, and turn conventions. The abstraction
-is not lossy: rendering a protocol trajectory into a surface and parsing it
-back recovers the original actions, with no mismatches in \numroundtrip{}
-render--parse checks over all \numactions{} actions
-(Section~\ref{sec:protocol}). This is a \emph{descriptive} claim about
-harnesses that already exist, not a proposal for a new standard.
+We argue that this shift can be avoided by separating what a harness asks the
+agent to do from how it presents it. Harnesses disagree on presentation
+almost everywhere: reading a file is \texttt{Read} in \claudecode{},
+\texttt{read} in \opencode{}, \texttt{file\_editor} with
+\texttt{command="view"} in \openhands{}, and a \texttt{sed -n} command in
+\codexcli{}, which has no file tools at all. Underneath, they do the same
+things: the four harnesses declare between $4$ and $21$ tools, yet all but
+$0.04\%$ of \numactions{} real calls map onto the same $12$ semantic actions
+(Table~\ref{tab:vocab}). We make this shared core explicit as the \HP{} and
+split every harness into two layers (Section~\ref{sec:protocol}): a
+\emph{semantic} layer, the protocol trajectory of actions and observations
+that any harness must carry, and a \emph{surface} layer of five independently
+settable axes, namely tool granularity and naming, call syntax, prompt
+documentation, observation formatting and turn conventions. The split loses
+nothing: rendering a protocol trajectory into any surface and parsing it back
+recovers the same actions in all \numroundtrip{} render--parse checks.
 
-Exact invertibility is what turns the protocol from an analysis tool into a
-training signal. If a real trajectory can be parsed into protocol form and
-re-rendered in an arbitrary surface, then a single collected episode represents an entire family of equivalent
-episodes. We introduce \method{} (Harness-INvariant Training), which trains on
-that family
-(Figure~\ref{fig:overview}, right). Counterfactual harness rendering (\chr{})
-re-renders every trajectory under freshly sampled surface configurations, and
-interface anonymization replaces tool names with meaningless identifiers on a
-fraction of samples, so that reading the documentation rather than recognizing
-the name becomes the only reliable strategy. \method{} needs no new task data
-and no architectural change.
+Because the two layers separate exactly, one collected trajectory stands for
+a whole family of trajectories that differ only in surface. We introduce
+\method{} (Harness-INvariant Training), which trains on that family
+(Figure~\ref{fig:overview}, right). Counterfactual harness rendering
+(\chr{}) parses each real trajectory into the protocol and re-renders it under
+freshly sampled surfaces, and interface anonymization replaces tool names
+with meaningless identifiers in a fraction of samples, so that the model must
+read the documentation rather than recognize a name. \method{} changes only
+the data: it needs no new tasks and no change to the model or objective.
 
-We fine-tune \basemodel{} on \claudecode{} trajectories and evaluate under real
-harnesses that training never showed as coherent wholes, against a \control{}
-trained on the same trajectories in their original harness for the same number
-of optimizer steps. \method{} matches the control on the source harness, is
-ahead on both benchmarks under each of the three unseen production harnesses,
-by up to $8.7$ points, and on \swem{} its accuracy varies by $1.6$ points
-across five harnesses against the control's $7.4$
-(Section~\ref{sec:step-matched}). Harness variation, in other words, is not a
-property of the task that a model must absorb, but a nuisance factor that a
-training pipeline can marginalize over. Our contributions are:
+We fine-tune \basemodel{} on \claudecode{} trajectories and compare \method{}
+with a control trained on the same trajectories in their original harness
+for the same number of optimizer steps. \method{} matches the control on
+\claudecode{} itself, leads under each of the three unseen production
+harnesses by up to $8.7$ points, and narrows the accuracy range across five
+harnesses on \swem{} from $7.4$ to $1.6$ points
+(Section~\ref{sec:step-matched}). It also performs on a par with a model
+trained on real trajectories collected in four harnesses
+(Section~\ref{sec:real}). Our contributions are:
 \begin{itemize}
-\item \textbf{The \HP{}}: harness choice alone moves \swev{} by up to
-  $9.0$ points for a fixed model and task set, yet \numactions{} real tool
-  calls from four harnesses reduce to a $12$-action vocabulary with
-  invertible surface rendering, which we formalize as the protocol
-  (Sections~\ref{sec:protocol} and~\ref{sec:harness-choice}).
-\item \textbf{\method{}}: training on counterfactual renderings of existing
-  trajectories, with no new task data and no architecture change
-  (Section~\ref{sec:method}).
-\item \textbf{Experiments}: a step-matched evaluation under five harnesses
-  (Section~\ref{sec:step-matched}), a comparison with real trajectories from
-  four harnesses (Section~\ref{sec:real}), and analyses of test-time
-  anonymization and of one surface axis at a time (Sections~\ref{sec:anon}
-  and~\ref{sec:axes}).
+\item \textbf{A two-layer view of harnesses}: four production harnesses share
+  one semantic core, which we formalize as the \HP{}, and surfaces can be
+  removed and re-applied without changing actions (Section~\ref{sec:protocol}).
+\item \textbf{\method{}}, a data-only training method that turns trajectories
+  from one harness into training data for many (Section~\ref{sec:method}).
+\item \textbf{Evidence} that harness choice alone moves accuracy, that
+  \method{} reduces this dependence at an equal training budget, and analyses
+  of the surface cues models rely on (Section~\ref{sec:exp}).
 \end{itemize}
 
 \section{The Harness Protocol}
@@ -688,8 +679,8 @@ production harnesses reduce to $12$ semantic actions, and making that core
 explicit as the \HP{} turns interface variation into a nuisance factor that a training
 pipeline can marginalize over, and \method{} does so with no new task data
 and no architectural change: it matches a single-harness control on that
-control's harness, is ahead under every
-unseen production harness by up to $8.7$ points, and is on a par with
+control's harness, is ahead under every unseen
+production harness, and is on a par with
 training on real trajectories from four harnesses. Aligning hidden
 representations across renderings is the natural next step.
 Appendix~\ref{sec:limits} discusses the limitations of this study.
